@@ -1,0 +1,56 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    
+    <!-- Package Information -->
+    <IsPackable>true</IsPackable>
+    <PackageId>PairAdmin.Core</PackageId>
+    <Title>PairAdmin Core Library</Title>
+    <Description>Core components for PairAdmin AI-Assisted Terminal Administration</Description>
+    <PackageTags>terminal;putty;ai;assistant;productivity</PackageTags>
+    
+    <!-- Version (managed by Directory.Build.props) -->
+    <Version>$(Version)</Version>
+    <AssemblyVersion>$(AssemblyVersion)</AssemblyVersion>
+    <FileVersion>$(FileVersion)</FileVersion>
+    
+    <!-- Package Metadata -->
+    <Authors>PairAdmin Team</Authors>
+    <Company>PairAdmin</Company>
+    <Product>PairAdmin</Product>
+    <Copyright>Copyright © 2024</Copyright>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageIcon>icon.png</PackageIcon>
+    <RepositoryUrl>https://github.com/sblanken/PairAdmin</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    
+    <!-- Source Control -->
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    
+    <!-- Dependencies -->
+    <Dependencies>
+      <Dependency ID="Microsoft.Extensions.Logging" Version="8.0.0" />
+      <Dependency ID="System.Text.Json" Version="8.0.0" />
+    </Dependencies>
+    
+    <!-- Framework References -->
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.SourceLink.GitHub" Version="1.1.1" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Commands\PairAdmin.Commands.csproj" />
+    <ProjectReference Include="..\..\src\Context\PairAdmin.Context.csproj" />
+    <ProjectReference Include="..\..\src\Security\PairAdmin.Security.csproj" />
+    <ProjectReference Include="..\..\src\Help\PairAdmin.Help.csproj" />
+    <ProjectReference Include="..\..\src\LLMGateway\PairAdmin.LLMGateway.csproj" />
+  </ItemGroup>
+
+</Project>

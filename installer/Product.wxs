@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  
+  <Product Id="*" 
+           Name="PairAdmin" 
+           Language="1033" 
+           Version="$(var.ProductVersion)" 
+           Manufacturer="PairAdmin Team" 
+           UpgradeCode="12345678-1234-1234-1234-123456789012">
+    
+    <Package InstallerVersion="200" 
+             Compressed="yes" 
+             InstallScope="perUser"
+             Description="AI-Assisted Terminal Administration Extension for PuTTY"
+             Comments="PairAdmin - Your AI Terminal Assistant" />
+    
+    <MajorUpgrade 
+        AllowSameVersionUpgrades="yes"
+        DowngradeErrorMessage="A newer version of PairAdmin is already installed." />
+    
+    <MediaTemplate EmbedCab="yes" />
+    
+    <!-- Features -->
+    <Feature Id="ProductFeature" Title="PairAdmin Application" Level="1">
+      <ComponentGroupRef Id="ProductComponents" />
+      <ComponentRef Id="ApplicationShortcutDesktop" />
+      <ComponentRef Id="ApplicationShortcutStartMenu" />
+      <ComponentRef Id="ApplicationUninstallShortcut" />
+    </Feature>
+    
+    <Feature Id="DocumentationFeature" Title="Documentation" Level="1">
+      <ComponentRef Id="DocumentationComponents" />
+    </Feature>
+    
+    <!-- License Agreement -->
+    <Property Id="WIX_LICENSE_RTF" Value="EULA.rtf" />
+    
+    <!-- Installation UI -->
+    <UIRef Id="WixUI_InstallDir" />
+    
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    
+    <!-- Custom Actions -->
+    <CustomAction Id="SetInstallFolder" Property="INSTALLFOLDER" Value="[ProgramFilesFolder]PairAdmin" />
+    
+    <!-- Launch application after installation -->
+    <Property Id="WIX_EXIT_DIALOG" Value="CheckBoxLaunchApplication" />
+    <CustomAction Id="LaunchApplication" FileKey="ApplicationExecutable" ExeCommand="" Execute="immediate" Impersonate="yes" />
+    
+    <!-- Enable checkbox to launch app -->
+    <UI>
+      <UIRef Id="WixUI_InstallDir" />
+      <Dialog Id="CheckBoxLaunchApplication" Width="370" Height="270" Title="Installation Complete">
+        <Control Id="Banner" Type="Bitmap" X="0" Y="0" Width="370" Height="44" Text="!(loc.InstallWelcomeBanner)" />
+        <Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="18" Text="!(loc.InstallCompleteTitle)" />
+        <Control Id="Description" Type="Text" X="135" Y="40" Width="220" Height="18" Text="!(loc.InstallCompleteMessage)" />
+        <Control Id="CheckBoxLaunch" Type="CheckBox" X="135" Y="60" Width="200" Height="18" Property="LAUNCHAPPLICATION" Text="Launch PairAdmin when setup exits" CheckBoxValue="1" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Finish" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUIFinish)" />
+      </Dialog>
+      <Publish Dialog="CheckBoxLaunchApplication" Control="Finish" Value="1" Order="1">LAUNCHAPPLICATION = "1" AND NOT Installed</Publish>
+      <Publish Dialog="CheckBoxLaunchApplication" Control="Finish" Value="2" Order="2">NOT Installed</Publish>
+    </UI>
+    
+  </Product>
+
+  <Fragment>
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLFOLDER" Name="PairAdmin" />
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="PairAdmin" />
+      </Directory>
+      <Directory Id="DesktopFolder" Name="Desktop" />
+      <Directory Id="AppDataFolder">
+        <Directory Id="PairAdminAppData" Name="PairAdmin" />
+      </Directory>
+    </Directory>
+  </Fragment>
+
+</Wix>

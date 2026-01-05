@@ -1,0 +1,183 @@
+name: PairAdmin CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '8.0.x'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+        configuration: [Debug]
+        include:
+          - os: windows-latest
+            configuration: Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup NuGet
+        uses: actions/setup-nuget@v1
+        with:
+          nuget-version: 'latest'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build
+        run: dotnet build --no-restore -c ${{ matrix.configuration }} --warnaserror
+
+      - name: Test
+        if: matrix.os != 'macos-latest' || matrix.configuration == 'Debug'
+        run: |
+          dotnet test tests/PairAdmin.Tests/PairAdmin.Tests.csproj \
+            --no-build \
+            -c ${{ matrix.configuration }} \
+            --collect:"XPlat Code Coverage" \
+            -- DataCollectionRunSettings.DataCollectors.DataCollector.Configuration.Format=opencover
+
+      - name: Upload Coverage
+        if: matrix.os == 'ubuntu-latest' && matrix.configuration == 'Debug'
+        uses: codecov/codecov-action@v3
+        with:
+          files: '**/coverage.opencover.xml'
+          fail_ci_if_error: true
+
+      - name: Upload Build Artifacts
+        if: matrix.os == 'windows-latest' && matrix.configuration == 'Release'
+        uses: actions/upload-artifact@v3
+        with:
+          name: build-output
+          path: |
+            bin/
+            !bin/**/*.Tests*
+
+  quality:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Build (Analysis Only)
+        run: dotnet build --no-restore -c Release
+
+      - name: Security Audit
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:csharp"
+
+  style:
+    runs-on: ubuntu-latest
+    needs: build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Check Formatting
+        run: |
+          dotnet format --verify-no-changes --exclude tests/
+
+  publish:
+    runs-on: ubuntu-latest
+    needs: [build, quality, style]
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Create Release Version
+        id: version
+        run: |
+          VERSION=$(date +'%Y.%m.%d')
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "PACKAGE_VERSION=$VERSION-preview.1" >> $GITHUB_OUTPUT
+
+      - name: Pack NuGet Packages
+        run: |
+          dotnet pack -c Release -p:Version=${{ steps.version.outputs.PACKAGE_VERSION }} --no-build
+
+      - name: Publish to NuGet
+        run: dotnet nuget push artifacts/*.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }} --skip-duplicate
+
+      - name: Create GitHub Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.VERSION }}
+          release_name: PairAdmin v${{ steps.version.outputs.VERSION }}
+          body_path: CHANGELOG.md
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: artifacts/*.nupkg
+          asset_content_type: application/zip
+
+  notify:
+    runs-on: ubuntu-latest
+    needs: [build, quality, style, publish]
+    if: always()
+
+    steps:
+      - name: Report Status
+        run: |
+          if: needs.build.result == 'failure' || needs.quality.result == 'failure'
+          then
+            echo "Build failed!"
+            exit 1
+          else
+            echo "All checks passed!"
+          fi

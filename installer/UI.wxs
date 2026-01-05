@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+  
+  <!-- Custom UI Sequence -->
+  <Fragment>
+    <UI Id="WixUI_InstallDir_Custom">
+      <UIRef Id="WixUI_InstallDir" />
+      
+      <!-- Add license checkbox -->
+      <Dialog Id="LicenseAgreement_Custom" Width="370" Height="270">
+        <Control Id="LicenseText" Type="ScrollableText" X="20" Y="40" Width="330" Height="140" Text="[WIX_LICENSE_RTF]" />
+        <Control Id="CheckBoxAgree" Type="CheckBox" X="20" Y="190" Width="330" Height="18" Property="LICENSE_ACCEPTED" Text="I agree to the license terms" CheckBoxValue="1" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Text="Next">
+          <Publish Dialog="LicenseAgreement_Custom" Control="Next" Event="NewDialog" Value="InstallDirDlg">LICENSE_ACCEPTED = "1"</Publish>
+        </Control>
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="Back">
+          <Publish Dialog="LicenseAgreement_Custom" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+        </Control>
+      </Dialog>
+      
+      <!-- Override Welcome Dialog to show license -->
+      <Dialog Id="WelcomeDlg_Custom" Width="370" Height="270">
+        <Control Id="Title" Type="Text" X="135" Y="20" Width="220" Height="18" Text="Welcome to PairAdmin Setup" />
+        <Control Id="Description" Type="Text" X="135" Y="40" Width="220" Height="18" Text="This wizard will guide you through installing PairAdmin." />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Text="Next">
+          <Publish Dialog="WelcomeDlg_Custom" Control="Next" Event="NewDialog" Value="LicenseAgreement_Custom" />
+        </Control>
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Text="Cancel" />
+      </Dialog>
+      
+      <!-- Use custom dialogs -->
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="LicenseAgreement_Custom" Order="1" />
+      <Publish Dialog="InstallDirDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Order="1" />
+    </UI>
+  </Fragment>
+  
+</Wix>

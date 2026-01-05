@@ -1,0 +1,12 @@
+global using Xunit;
+global using FluentAssertions;
+global using Moq;
+global using Microsoft.Extensions.Logging;
+global using PairAdmin;
+global using PairAdmin.Commands;
+global using PairAdmin.Chat;
+global using PairAdmin.Configuration;
+global using PairAdmin.Context;
+global using PairAdmin.LLMGateway;
+global using PairAdmin.Security;
+global using PairAdmin.Help;
