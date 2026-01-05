@@ -1,0 +1,98 @@
+<UserControl x:Class="PairAdmin.UI.Controls.TerminalPane"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d">
+    
+    <Border Background="#1E1E1E" 
+            BorderThickness="0,0,0,1" 
+            BorderBrush="#3F3F46">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Terminal Header -->
+            <Grid Grid.Row="0" 
+                  Background="#2D2D30" 
+                  Height="32">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <!-- Title -->
+                <TextBlock Grid.Column="0" 
+                           Text="Terminal" 
+                           Foreground="White" 
+                           VerticalAlignment="Center" 
+                           Margin="12,0" 
+                           FontWeight="SemiBold"/>
+
+                <!-- Window Controls (placeholder for future integration) -->
+                <StackPanel Grid.Column="1" 
+                            Orientation="Horizontal" 
+                            VerticalAlignment="Center" 
+                            Margin="8,0">
+                    <!-- These will be functional when PuTTY is actually embedded -->
+                    <TextBlock Text="⊟" 
+                               FontSize="14" 
+                               Foreground="#808080" 
+                               Margin="8,0"/>
+                    <TextBlock Text="□" 
+                               FontSize="14" 
+                               Foreground="#808080" 
+                               Margin="8,0"/>
+                    <TextBlock Text="×" 
+                               FontSize="14" 
+                               Foreground="#808080" 
+                               Margin="8,0"/>
+                </StackPanel>
+            </Grid>
+
+            <!-- Terminal Content Area -->
+            <Border Grid.Row="1" 
+                    Background="#0C0C0C" 
+                    Padding="8">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" 
+                              HorizontalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <!-- Placeholder for PuTTY window embedding -->
+                        <TextBlock Text="Terminal Pane - PuTTY will be embedded here" 
+                                   Foreground="#00FF00" 
+                                   FontSize="16" 
+                                   FontWeight="Medium" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center" 
+                                   Margin="20"/>
+                        
+                        <!-- Status Information -->
+                        <TextBlock Text="Current Status: Placeholder (No PuTTY connection)" 
+                                   Foreground="#808080" 
+                                   FontSize="12" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center" 
+                                   Margin="20,0"/>
+                        
+                        <!-- Instructions -->
+                        <TextBlock TextWrapping="Wrap" 
+                                   Foreground="#666666" 
+                                   FontSize="11" 
+                                   HorizontalAlignment="Center" 
+                                   VerticalAlignment="Center" 
+                                   Margin="20,10">
+                            <Run Text="PuTTY terminal will be embedded in this pane."/>
+                            <LineBreak/>
+                            <Run Text="Task 1.4 status: In progress - implementing WindowsFormsHostElement for embedding."/>
+                            <LineBreak/>
+                            <Run Text="Note: This is a stub implementation."/>
+                            <LineBreak/>
+                            <Run Text="Actual PuTTY integration requires Windows environment with PuTTY library."/>
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Border>
+</UserControl>
