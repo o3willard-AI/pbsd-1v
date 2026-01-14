@@ -1,176 +1,202 @@
 using System;
-using System.Runtime.CompilerServices;
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
+using System.Windows.Interop;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
+using PairAdmin.Interop;
 
 namespace PairAdmin.UI.Controls;
 
-/// <summary>
-/// Terminal pane control that hosts PuTTY terminal window
-/// </summary>
-public partial class TerminalPane : UserControl
+public partial class TerminalPane : UserControl, IDisposable
 {
     private readonly ILogger<TerminalPane> _logger;
     private IntPtr _puttyWindowHandle = IntPtr.Zero;
+    private Process? _puttyProcess;
+    private bool _isConnected;
+    private bool _disposed;
 
-    /// <summary>
-    /// Initializes a new instance of TerminalPane class
-    /// </summary>
+    public event EventHandler? Connected;
+    public event EventHandler? Disconnected;
+    public bool IsConnected => _isConnected;
+    public IntPtr WindowHandle => _puttyWindowHandle;
+
+    public TerminalPane() : this(NullLogger<TerminalPane>.Instance)
+    {
+    }
+
     public TerminalPane(ILogger<TerminalPane> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         InitializeComponent();
+        Loaded += OnLoaded;
+        Unloaded += OnUnloaded;
+        SizeChanged += OnSizeChanged;
     }
 
-    /// <summary>
-    /// Initialize terminal pane
-    /// </summary>
-    private void InitializeTerminal()
+    private void InitializeTerminal() => _logger.LogInformation("Initializing TerminalPane");
+
+    private void ConnectButton_Click(object sender, RoutedEventArgs e)
     {
-        _logger.LogInformation("Initializing TerminalPane");
-
-        // TODO: Initialize PuTTY via WindowsFormsHostElement
-        // This requires:
-        // 1. PuTTY static library (PuTTY.lib or PairAdminPuTTY.lib)
-        // 2. WindowsFormsHostElement in XAML
-        // 3. PuTTY window handle embedding
-
-        // Stub implementation for development:
-        _logger.LogWarning("PuTTY embedding is stubbed - actual implementation requires Windows environment");
-        _logger.LogWarning("Required components:");
-        _logger.LogWarning("  - PuTTY.lib compiled from PuTTY source with PairAdmin modifications");
-        _logger.LogWarning("  - WindowsFormsHostElement for embedding");
-        _logger.LogWarning("  - PuTTYInterop.cs for C# interop layer");
-    }
-
-    /// <summary>
-    /// Connect to PuTTY session (stub)
-    /// </summary>
-    public void ConnectToPuTTY(string hostname, int port = 22, string username = "")
-    {
-        _logger.LogInformation("ConnectToPuTTY called: {hostname}:{port}", hostname, port);
-
-        // TODO: Implement actual PuTTY connection logic
-        // This would call PuTTY's configuration dialog programmatically
-        // or create a new session with specified parameters
-
-        // Stub implementation:
-        _logger.LogWarning("PuTTY connection logic is stubbed");
-        UpdateStatus($"Connecting to {hostname}:{port}...");
-    }
-
-    /// <summary>
-    /// Disconnect from PuTTY session (stub)
-    /// </summary>
-    public void DisconnectFromPuTTY()
-    {
-        _logger.LogInformation("DisconnectFromPuTTY called");
-
-        // TODO: Implement actual PuTTY disconnection logic
-        // This would close the current SSH session
-
-        // Stub implementation:
-        _logger.LogWarning("PuTTY disconnection logic is stubbed");
-        UpdateStatus("Not connected");
-    }
-
-    /// <summary>
-    /// Send command to terminal (stub)
-    /// </summary>
-    public void SendCommand(string command)
-    {
-        if (string.IsNullOrWhiteSpace(command))
+        var hostname = HostnameTextBox.Text.Trim();
+        if (string.IsNullOrEmpty(hostname))
         {
+            MessageBox.Show("Please enter a hostname.", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
-        _logger.LogDebug("SendCommand: {Command}", command);
-
-        // TODO: Implement actual command sending to PuTTY
-        // This would:
-        // 1. Get PuTTY window handle
-        // 2. Set focus to PuTTY window
-        // 3. Send keystrokes via SendInput or SendMessage
-
-        // Stub implementation:
-        _logger.LogWarning("Command sending logic is stubbed");
-    }
-
-    /// <summary>
-    /// Resize terminal pane (stub)
-    /// </summary>
-    public void ResizeTerminal(double width, double height)
-    {
-        _logger.LogDebug("ResizeTerminal: {Width}x{Height}", width, height);
-
-        // TODO: Implement actual PuTTY window resizing
-        // This would:
-        // 1. Call SetWindowPos API on PuTTY window handle
-        // 2. Update width and height
-        // 3. Maintain parent-child relationship
-
-        // Stub implementation:
-        _logger.LogWarning("Terminal resizing logic is stubbed");
-    }
-
-    /// <summary>
-    /// Update status display (stub)
-    /// </summary>
-    private void UpdateStatus(string status)
-    {
-        // Find status TextBlock in visual tree
-        if (FindName("StatusTextBlock") is TextBlock statusBlock)
+        if (!int.TryParse(PortTextBox.Text, out int port) || port < 1 || port > 65535)
         {
-            statusBlock.Text = status;
-            _logger.LogDebug("Status updated: {Status}", status);
+            MessageBox.Show("Please enter a valid port number (1-65535).", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        var username = UsernameTextBox.Text.Trim();
+        ConnectToPuTTY(hostname, port, username);
+    }
+
+    private void DisconnectButton_Click(object sender, RoutedEventArgs e)
+    {
+        DisconnectFromPuTTY();
+    }
+
+    private void UpdateConnectionUI(bool connected, string hostname = "")
+    {
+        Dispatcher.Invoke(() =>
+        {
+            if (connected)
+            {
+                ConnectionStatusText.Text = $" - Connected to {hostname}";
+                ConnectionStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(39, 174, 96));
+                ConnectionBar.Visibility = Visibility.Collapsed;
+                DisconnectButton.Visibility = Visibility.Visible;
+                PlaceholderPanel.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                ConnectionStatusText.Text = " - Disconnected";
+                ConnectionStatusText.Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(128, 128, 128));
+                ConnectionBar.Visibility = Visibility.Visible;
+                DisconnectButton.Visibility = Visibility.Collapsed;
+                PlaceholderPanel.Visibility = Visibility.Visible;
+            }
+        });
+    }
+
+    public void ConnectToPuTTY(string hostname, int port = 22, string username = "")
+    {
+        if (_isConnected) DisconnectFromPuTTY();
+        _logger.LogInformation("Connecting to {Hostname}:{Port}", hostname, port);
+        try
+        {
+            var args = new StringBuilder("-ssh ");
+            if (!string.IsNullOrEmpty(username)) args.Append("-l " + username + " ");
+            args.Append("-P " + port + " " + hostname);
+
+            _puttyProcess = Process.Start(new ProcessStartInfo
+            {
+                FileName = "putty.exe",
+                Arguments = args.ToString(),
+                UseShellExecute = false
+            });
+            _puttyProcess?.WaitForInputIdle(5000);
+            _puttyWindowHandle = _puttyProcess?.MainWindowHandle ?? IntPtr.Zero;
+
+            if (_puttyWindowHandle != IntPtr.Zero)
+            {
+                EmbedPuTTYWindow();
+                _isConnected = true;
+                UpdateConnectionUI(true, hostname);
+                Connected?.Invoke(this, EventArgs.Empty);
+            }
+            else
+            {
+                MessageBox.Show("Failed to start PuTTY. Make sure putty.exe is installed and in your PATH.",
+                    "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to connect");
+            MessageBox.Show($"Failed to connect: {ex.Message}", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
     }
 
-    /// <summary>
-    /// Find visual element by name (helper for XAML template)
-    /// </summary>
-    private T? FindName<T>(string name) where T : DependencyObject
+    private void EmbedPuTTYWindow()
     {
-        return this.FindName<T>(name);
+        if (_puttyWindowHandle == IntPtr.Zero) return;
+        var wpfHandle = GetWpfWindowHandle();
+        if (wpfHandle == IntPtr.Zero) return;
+
+        int style = NativeMethods.GetWindowLong(_puttyWindowHandle, -16);
+        style = (style & ~0x00CC0000) | 0x40000000;
+        NativeMethods.SetWindowLong(_puttyWindowHandle, -16, style);
+        PuTTYInterop.SetParentWindow(_puttyWindowHandle, wpfHandle);
+        ResizeTerminalToFit();
+        PuTTYInterop.Show(_puttyWindowHandle);
     }
 
-    /// <summary>
-    /// Load window handle after PuTTY is embedded (stub)
-    /// </summary>
-    public void SetPuTTYWindowHandle(IntPtr handle)
+    private IntPtr GetWpfWindowHandle()
     {
-        _puttyWindowHandle = handle;
-        _logger.LogInformation("PuTTY window handle set: {Handle}", handle);
-
-        // TODO: Use this handle for:
-        // 1. Parent-child window management
-        // 2. Resize synchronization
-        // 3. Focus management
+        var window = Window.GetWindow(this);
+        return window != null ? new WindowInteropHelper(window).Handle : IntPtr.Zero;
     }
 
-    /// <summary>
-    /// Handle window loaded event
-    /// </summary>
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    public void DisconnectFromPuTTY()
     {
-        _logger.LogDebug("TerminalPane loaded");
-        InitializeTerminal();
+        try
+        {
+            if (_puttyProcess != null && !_puttyProcess.HasExited)
+            {
+                _puttyProcess.CloseMainWindow();
+                if (!_puttyProcess.WaitForExit(2000)) _puttyProcess.Kill();
+                _puttyProcess.Dispose();
+            }
+            _puttyProcess = null;
+            _puttyWindowHandle = IntPtr.Zero;
+            _isConnected = false;
+            UpdateConnectionUI(false);
+            Disconnected?.Invoke(this, EventArgs.Empty);
+        }
+        catch (Exception ex) { _logger.LogError(ex, "Error disconnecting"); }
     }
 
-    /// <summary>
-    /// Handle window unloaded event for cleanup
-    /// </summary>
-    private void OnUnloaded(object sender, RoutedEventArgs e)
+    public void SendCommand(string command)
     {
-        _logger.LogDebug("TerminalPane unloaded");
+        if (string.IsNullOrEmpty(command) || _puttyWindowHandle == IntPtr.Zero) return;
+        NativeMethods.SetForegroundWindow(_puttyWindowHandle);
+        foreach (char c in command)
+            NativeMethods.SendMessage(_puttyWindowHandle, 0x0102, (IntPtr)c, IntPtr.Zero);
+        NativeMethods.SendMessage(_puttyWindowHandle, 0x0102, (IntPtr)13, IntPtr.Zero);
+    }
 
-        // TODO: Cleanup PuTTY resources
-        // 1. Unhook callbacks
-        // 2. Destroy PuTTY window handle
-        // 3. Release any allocated resources
+    private void ResizeTerminalToFit()
+    {
+        if (_puttyWindowHandle == IntPtr.Zero) return;
+        PuTTYInterop.ResizeChildWindow(_puttyWindowHandle, 0, 0, (int)ActualWidth, (int)ActualHeight);
+    }
 
-        _logger.LogWarning("PuTTY cleanup logic is stubbed");
+    public void ResizeTerminal(double w, double h)
+    {
+        if (_puttyWindowHandle != IntPtr.Zero)
+            PuTTYInterop.ResizeChildWindow(_puttyWindowHandle, 0, 0, (int)w, (int)h);
+    }
+
+    private void UpdateStatus(string s) { if (FindName("StatusTextBlock") is TextBlock tb) tb.Text = s; }
+    public void SetPuTTYWindowHandle(IntPtr h) { _puttyWindowHandle = h; if (h != IntPtr.Zero) EmbedPuTTYWindow(); }
+    private void OnLoaded(object s, RoutedEventArgs e) => InitializeTerminal();
+    private void OnUnloaded(object s, RoutedEventArgs e) => Dispose();
+    private void OnSizeChanged(object s, SizeChangedEventArgs e) => ResizeTerminalToFit();
+    public void Dispose() { if (!_disposed) { DisconnectFromPuTTY(); _disposed = true; } }
+
+    private static class NativeMethods
+    {
+        [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
+        [DllImport("user32.dll")] public static extern int SetWindowLong(IntPtr h, int i, int v);
+        [DllImport("user32.dll")] public static extern bool SetForegroundWindow(IntPtr h);
+        [DllImport("user32.dll")] public static extern IntPtr SendMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
     }
 }

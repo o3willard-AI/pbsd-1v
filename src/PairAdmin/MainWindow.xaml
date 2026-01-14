@@ -3,14 +3,14 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:uiControls="clr-namespace:PairAdmin.UI.Controls;assembly=UI"
         mc:Ignorable="d"
         Title="PairAdmin - AI-Assisted Terminal Administration"
         Height="800"
         Width="1200"
         WindowStartupLocation="CenterScreen"
         MinHeight="400"
-        MinWidth="800"
-        Icon="Assets/app.ico">
+        MinWidth="800">
     
     <Grid>
         <Grid.RowDefinitions>
@@ -86,18 +86,10 @@
                     Cursor="SizeNS"
                     MouseLeftButtonDown="Divider_MouseLeftButtonDown"/>
             
-            <!-- AI Chat Pane (Placeholder for Task 3.1) -->
-            <Border Grid.Row="2" 
-                    BorderBrush="#3F3F46"
-                    BorderThickness="0,0,0,1"
-                    Background="#1E1E1E">
-                <TextBlock Text="AI Assistant Pane" 
-                           HorizontalAlignment="Center" 
-                           VerticalAlignment="Center"
-                           Foreground="#808080"
-                           FontSize="16"
-                           FontWeight="Medium"/>
-            </Border>
+            <!-- AI Chat Pane -->
+            <uiControls:ChatPane x:Name="ChatPaneControl"
+                                  Grid.Row="2"
+                                  MinHeight="200"/>
         </Grid>
     </Grid>
 </Window>

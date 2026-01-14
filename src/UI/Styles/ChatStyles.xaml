@@ -43,8 +43,8 @@
     <Thickness x:Key="PaddingSmall">4,8</Thickness>
     <Thickness x:Key="PaddingNormal">8,12</Thickness>
     <Thickness x:Key="PaddingLarge">12,16</Thickness>
-    <sys:Double x:Key="CornerRadius">4</sys:Double>
-    <sys:Double x:Key="MessageCornerRadius">8</sys:Double>
+    <CornerRadius x:Key="CornerRadius">4</CornerRadius>
+    <CornerRadius x:Key="MessageCornerRadius">8</CornerRadius>
 
     <!-- Button Styles -->
     <Style x:Key="BaseButtonStyle" TargetType="Button">

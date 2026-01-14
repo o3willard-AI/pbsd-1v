@@ -1,11 +1,34 @@
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Input;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using PairAdmin.Chat;
 
 namespace PairAdmin.UI.Controls;
+
+/// <summary>
+/// Converter that returns true if text is not empty
+/// </summary>
+public class NotEmptyConverter : IMultiValueConverter
+{
+    public object Convert(object[] values, Type targetType, object parameter, CultureInfo culture)
+    {
+        if (values.Length > 0 && values[0] is string text)
+        {
+            return !string.IsNullOrWhiteSpace(text);
+        }
+        return false;
+    }
+
+    public object[] ConvertBack(object value, Type[] targetTypes, object parameter, CultureInfo culture)
+    {
+        throw new NotImplementedException();
+    }
+}
 
 /// <summary>
 /// Main chat pane control for AI assistant
@@ -47,6 +70,13 @@ public partial class ChatPane : UserControl
             _isProcessing = value;
             UpdateUIState();
         }
+    }
+
+    /// <summary>
+    /// Initializes a new instance of ChatPane (for XAML)
+    /// </summary>
+    public ChatPane() : this(NullLogger<ChatPane>.Instance)
+    {
     }
 
     /// <summary>
