@@ -186,20 +186,69 @@ public partial class TerminalPane : UserControl, IDisposable
             _callbackDelegate = OnPuTTYCallback;
             PuTTYInterop.RegisterCallback(_callbackDelegate);
 
-            // TODO: Initialize PuTTY session via DLL
-            // This requires additional exported functions from PairAdminPuTTY.dll:
-            // - pairadmin_connect(hostname, port, username)
-            // - pairadmin_disconnect()
-            //
-            // For now, fall back to external mode with a message
-            MessageBox.Show(
-                "Integrated PuTTY mode requires additional DLL functions.\n\n" +
-                "Falling back to External PuTTY mode for this connection.\n" +
-                "Full integration will be available in a future update.",
-                "Integration Pending",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            // Initialize integrated PuTTY (required before connect)
+            var wpfHandle = GetWpfWindowHandle();
+            if (!PuTTYInterop.Initialize(wpfHandle))
+            {
+                _logger.LogWarning("Integrated PuTTY initialization failed, falling back to external");
+                MessageBox.Show(
+                    "Integrated PuTTY initialization failed.\n\n" +
+                    "This is expected - full DLL integration is still in development.\n" +
+                    "Falling back to External PuTTY mode.",
+                    "Integration Not Available",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                ConnectExternal(hostname, port, username);
+                return;
+            }
 
+            // Connect via integrated PuTTY DLL
+            bool success = PuTTYInterop.Connect(hostname, port, username);
+            if (!success)
+            {
+                _logger.LogWarning("Integrated PuTTY connection failed, falling back to external");
+                MessageBox.Show(
+                    "Integrated PuTTY connection could not be established.\n\n" +
+                    "Falling back to External PuTTY mode.",
+                    "Connection Fallback",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                ConnectExternal(hostname, port, username);
+                return;
+            }
+
+            // Get the terminal window handle from integrated PuTTY
+            _puttyWindowHandle = PuTTYInterop.GetTerminalHandle();
+            if (_puttyWindowHandle != IntPtr.Zero)
+            {
+                EmbedPuTTYWindow();
+                _isConnected = true;
+                UpdateConnectionUI(true, hostname);
+                Connected?.Invoke(this, EventArgs.Empty);
+                _logger.LogInformation("Connected to {Hostname} via integrated PuTTY", hostname);
+            }
+            else
+            {
+                _logger.LogWarning("Integrated PuTTY window handle not available");
+                MessageBox.Show(
+                    "Connection initiated but terminal window not available.\n\n" +
+                    "Falling back to External PuTTY mode.",
+                    "Connection Notice",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                PuTTYInterop.Disconnect();
+                ConnectExternal(hostname, port, username);
+            }
+        }
+        catch (DllNotFoundException ex)
+        {
+            _logger.LogError(ex, "PairAdminPuTTY.dll not found");
+            MessageBox.Show(
+                "PairAdminPuTTY.dll could not be loaded.\n\n" +
+                "Falling back to External PuTTY mode.",
+                "DLL Load Error",
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning);
             ConnectExternal(hostname, port, username);
         }
         catch (Exception ex)
@@ -401,6 +450,20 @@ public partial class TerminalPane : UserControl, IDisposable
     {
         try
         {
+            // Disconnect integrated PuTTY if in that mode
+            if (_settings.Mode == TerminalMode.Integrated && _puttyProcess == null)
+            {
+                try
+                {
+                    PuTTYInterop.Disconnect();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error disconnecting integrated PuTTY");
+                }
+            }
+
+            // Disconnect external PuTTY process
             if (_puttyProcess != null && !_puttyProcess.HasExited)
             {
                 _puttyProcess.CloseMainWindow();

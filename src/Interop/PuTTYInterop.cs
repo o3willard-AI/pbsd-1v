@@ -52,7 +52,41 @@ public static class PuTTYInterop
     /// </summary>
     /// <returns>Handle to PuTTY terminal window</returns>
     [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
-    public static extern IntPtr putty_get_terminal_hwnd();
+    public static extern IntPtr pairadmin_get_terminal_hwnd();
+
+    /// <summary>
+    /// Initialize the PuTTY subsystem
+    /// </summary>
+    /// <param name="parentHwnd">Parent window handle for embedding (can be IntPtr.Zero)</param>
+    /// <returns>0 on success, non-zero on failure</returns>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int pairadmin_init(IntPtr parentHwnd);
+
+    /// <summary>
+    /// Connect to an SSH server
+    /// </summary>
+    /// <param name="hostname">Host to connect to</param>
+    /// <param name="port">Port number (default 22)</param>
+    /// <param name="username">Username for authentication</param>
+    /// <returns>0 on success, non-zero on failure</returns>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl, CharSet = CharSet.Ansi)]
+    public static extern int pairadmin_connect(
+        [MarshalAs(UnmanagedType.LPStr)] string hostname,
+        int port,
+        [MarshalAs(UnmanagedType.LPStr)] string? username);
+
+    /// <summary>
+    /// Disconnect from the SSH server
+    /// </summary>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
+    public static extern void pairadmin_disconnect();
+
+    /// <summary>
+    /// Check if connected to SSH server
+    /// </summary>
+    /// <returns>1 if connected, 0 if not</returns>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int pairadmin_is_connected();
 
     #endregion
 
@@ -135,11 +169,6 @@ public static class PuTTYInterop
         public const int SW_SHOWDEFAULT = 10;
         public const int SW_FORCEMINIMIZE = 11;
         public const int SW_MAX = 11;
-        public const int SW_SHOWNA = 12;
-        public const int SW_SHOWNA = 13;
-        public const int SW_RESTOREMAXIMIZED = 13;
-        public const int SW_SHOWNA = 14;
-        public const int SW_SHOWNA = 15;
     }
 
     #endregion
@@ -168,6 +197,51 @@ public static class PuTTYInterop
     public static void RegisterCallback(PairAdminCallback callback)
     {
         pairadmin_set_callback(callback);
+    }
+
+    /// <summary>
+    /// Initialize the integrated PuTTY library
+    /// </summary>
+    /// <param name="parentHwnd">Parent window handle for embedding (optional)</param>
+    /// <returns>True if initialization was successful</returns>
+    public static bool Initialize(IntPtr parentHwnd = default)
+    {
+        int result = pairadmin_init(parentHwnd);
+        return result == 0;
+    }
+
+    /// <summary>
+    /// Connect to an SSH server using the integrated PuTTY library
+    /// </summary>
+    /// <param name="hostname">Host to connect to</param>
+    /// <param name="port">Port number (default 22)</param>
+    /// <param name="username">Username for authentication (optional)</param>
+    /// <returns>True if connection was initiated successfully</returns>
+    public static bool Connect(string hostname, int port = 22, string? username = null)
+    {
+        int result = pairadmin_connect(hostname, port, username ?? "");
+        return result == 0;
+    }
+
+    /// <summary>
+    /// Disconnect from the SSH server
+    /// </summary>
+    public static void Disconnect()
+    {
+        pairadmin_disconnect();
+    }
+
+    /// <summary>
+    /// Check if currently connected to an SSH server
+    /// </summary>
+    public static bool IsConnected => pairadmin_is_connected() != 0;
+
+    /// <summary>
+    /// Get the terminal window handle from the integrated PuTTY
+    /// </summary>
+    public static IntPtr GetTerminalHandle()
+    {
+        return pairadmin_get_terminal_hwnd();
     }
 
     /// <summary>
