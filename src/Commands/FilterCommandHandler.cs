@@ -1,3 +1,4 @@
+using System.Text;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 
@@ -32,7 +33,7 @@ public class FilterCommandHandler : CommandHandlerBase
         MinArguments = 0,
         MaxArguments = 2,
         Aliases = ["mask", "redact"]
-    }
+    };
 
     public override CommandResult Execute(CommandContext context, ParsedCommand command)
     {
@@ -83,15 +84,15 @@ public class FilterCommandHandler : CommandHandlerBase
 
             _logger.LogInformation("Added filter: {Pattern} (regex: {IsRegex})", pattern, isRegex);
 
-            var sb = new StringBuilder();
-            sb.AppendLine("## Filter Added");
-            sb.AppendLine();
-            sb.AppendLine($"**Pattern:** `{pattern}`");
-            sb.AppendLine($"**Type:** {(isRegex ? "Regex" : "Text")}");
-            sb.AppendLine($"**Total Filters:** {_filters.Count}");
-            sb.AppendLine();
+            var sb2 = new StringBuilder();
+            sb2.AppendLine("## Filter Added");
+            sb2.AppendLine();
+            sb2.AppendLine($"**Pattern:** `{pattern}`");
+            sb2.AppendLine($"**Type:** {(isRegex ? "Regex" : "Text")}");
+            sb2.AppendLine($"**Total Filters:** {_filters.Count}");
+            sb2.AppendLine();
 
-            return Success(sb.ToString());
+            return Success(sb2.ToString());
         }
         catch (Exception ex)
         {
@@ -211,7 +212,7 @@ public class FilterCommandHandler : CommandHandlerBase
 
     public IReadOnlyList<FilterEntry> GetFilters() => _filters.AsReadOnly();
 
-    private class FilterEntry
+    public class FilterEntry
     {
         public string Pattern { get; set; } = string.Empty;
         public bool IsRegex { get; set; }

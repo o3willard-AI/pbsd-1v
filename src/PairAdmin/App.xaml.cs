@@ -92,4 +92,3 @@ public partial class App : Application
         services.AddSingleton<MainWindow>();
     }
 }
-}

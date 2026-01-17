@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 using PairAdmin.LLMGateway.Models;
 
@@ -142,6 +143,9 @@ public class OpenAIProvider : ILLMProvider
             throw new LLMGatewayException("Provider is not configured");
         }
 
+        var responses = new List<StreamingCompletionResponse>();
+        Exception? capturedException = null;
+
         try
         {
             var openaiRequest = ConvertToOpenAIRequest(request);
@@ -152,7 +156,7 @@ public class OpenAIProvider : ILLMProvider
             {
                 if (chunk.IsDone)
                 {
-                    yield return StreamingCompletionResponse.Complete(chunk.Choices?.FirstOrDefault()?.FinishReason ?? "stop");
+                    responses.Add(StreamingCompletionResponse.Complete(chunk.Choices?.FirstOrDefault()?.FinishReason ?? "stop"));
                     break;
                 }
 
@@ -161,12 +165,12 @@ public class OpenAIProvider : ILLMProvider
                 {
                     cumulativeContent.Append(content);
 
-                    yield return new StreamingCompletionResponse(content, chunkIndex)
+                    responses.Add(new StreamingCompletionResponse(content, chunkIndex)
                     {
                         Provider = _providerInfo.Id,
                         Model = chunk.Model,
                         CumulativeTokens = EstimateTokenCount(cumulativeContent.ToString())
-                    };
+                    });
 
                     chunkIndex++;
                 }
@@ -181,10 +185,21 @@ public class OpenAIProvider : ILLMProvider
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to stream completion");
-            throw new LLMProviderException(
+            capturedException = new LLMProviderException(
                 _providerInfo.Id,
                 "Failed to stream completion",
                 ex);
+        }
+
+        // Yield outside try-catch
+        foreach (var response in responses)
+        {
+            yield return response;
+        }
+
+        if (capturedException != null)
+        {
+            throw capturedException;
         }
     }
 
@@ -328,10 +343,5 @@ public class OpenAIProvider : ILLMProvider
     private string? ExtractDeltaContent(OpenAIStreamChunk chunk)
     {
         return chunk.Choices?.FirstOrDefault()?.Delta?.Content;
-    }
-
-    private int EstimateTokenCount(string text)
-    {
-        return text.Length / 4;
     }
 }

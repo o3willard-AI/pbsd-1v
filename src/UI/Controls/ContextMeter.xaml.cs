@@ -50,7 +50,7 @@ public class ContextMeterState : INotifyPropertyChanged
     public double Percentage
     {
         get => _percentage;
-        private set
+        internal set
         {
             _percentage = value;
             OnPropertyChanged(nameof(Percentage));
@@ -66,8 +66,6 @@ public class ContextMeterState : INotifyPropertyChanged
     public string FormattedTokenCount => $"{CurrentTokens:N0} / {MaxTokens:N0}";
 
     public string FormattedMaxTokens => MaxTokens.ToString("N0");
-
-    public string FormattedPercentage => Percentage.ToString("P1");
 
     public string StatusText => Percentage switch
     {

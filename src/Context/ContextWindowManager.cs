@@ -111,6 +111,26 @@ public class ContextWindowManager
     public event EventHandler<TruncationResult>? ContextTruncated;
 
     /// <summary>
+    /// Gets the current policy
+    /// </summary>
+    public ContextSizePolicy Policy => _policy;
+
+    /// <summary>
+    /// Gets the maximum number of lines
+    /// </summary>
+    public int MaxLines => _policy.MaxLines;
+
+    /// <summary>
+    /// Gets the current number of lines in context
+    /// </summary>
+    public int CurrentLines => _contextProvider.GetContext().Split('\n').Length;
+
+    /// <summary>
+    /// Gets the current token count
+    /// </summary>
+    public int CurrentTokens => GetContextSize();
+
+    /// <summary>
     /// Initializes a new instance of ContextWindowManager
     /// </summary>
     public ContextWindowManager(
@@ -340,5 +360,25 @@ public class ContextWindowManager
         var currentSize = GetContextSize();
         var effectiveMax = GetEffectiveMax();
         return currentSize > effectiveMax;
+    }
+
+    /// <summary>
+    /// Clears the context
+    /// </summary>
+    public void Clear()
+    {
+        _contextProvider.Clear();
+        _logger.LogInformation("Context cleared");
+    }
+
+    /// <summary>
+    /// Sets the context size as a percentage of model max
+    /// </summary>
+    /// <param name="percentage">Percentage (0.0 to 1.0)</param>
+    public void SetPercentage(double percentage)
+    {
+        _policy.Percentage = Math.Clamp(percentage, 0.0, 1.0);
+        _policy.Mode = ContextSizeMode.Percentage;
+        _logger.LogInformation($"Context size set to {percentage:P0} of model max");
     }
 }

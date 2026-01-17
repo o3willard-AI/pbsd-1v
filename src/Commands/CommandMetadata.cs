@@ -140,9 +140,9 @@ public class CommandContext
     public Context.ContextWindowManager? ContextManager { get; set; }
 
     /// <summary>
-    /// Chat pane for UI operations
+    /// Chat pane for UI operations (typed as object to avoid circular dependency)
     /// </summary>
-    public UI.Controls.ChatPane? ChatPane { get; set; }
+    public object? ChatPane { get; set; }
 
     /// <summary>
     /// Cancellation token

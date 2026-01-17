@@ -1,7 +1,9 @@
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using PairAdmin.UI;
 
 namespace PairAdmin;
 
@@ -12,7 +14,6 @@ public partial class MainWindow : Window
 {
     private readonly ILogger<MainWindow> _logger;
     private readonly WindowStateManager _windowStateManager;
-    private WindowState? _lastWindowState;
 
     /// <summary>
     /// Initializes a new instance of MainWindow class
@@ -22,11 +23,11 @@ public partial class MainWindow : Window
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _windowStateManager = windowStateManager ?? throw new ArgumentNullException(nameof(windowStateManager));
         InitializeComponent();
-        
+
         // Subscribe to window events
         this.StateChanged += MainWindow_StateChanged;
         this.Closing += MainWindow_Closing;
-        
+
         // Restore window state if available
         RestoreWindowState();
     }
@@ -35,26 +36,26 @@ public partial class MainWindow : Window
     /// Window state changed event handler
     /// </summary>
     private void MainWindow_StateChanged(object? sender, EventArgs e)
-{
+    {
         _logger.LogDebug("Window state changed: {WindowState}", this.WindowState);
-        
+
         // Save window state when changed (but not while maximized)
-        if (this.WindowState == WindowState.Normal)
+        if (this.WindowState == System.Windows.WindowState.Normal)
         {
             SaveWindowState();
         }
-}
+    }
 
     /// <summary>
     /// Window closing event handler
     /// </summary>
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
-{
+    {
         _logger.LogInformation("MainWindow closing");
-        
+
         // Save window state before closing
         SaveWindowState();
-}
+    }
 
     /// <summary>
     /// Save current window state
@@ -71,48 +72,6 @@ public partial class MainWindow : Window
     {
         _windowStateManager.RestoreState(this);
     }
-
-        var state = new WindowState
-        {
-            Width = this.Width,
-            Height = this.Height,
-            Left = this.Left,
-            Top = this.Top,
-            IsMaximized = false
-        };
-
-        _lastWindowState = state;
-        
-        // TODO: Persist to application settings in future task
-        _logger.LogDebug("Saved window state: {Width}x{Height} at ({Left}, {Top})", 
-            state.Width, state.Height, state.Left, state.Top);
-}
-
-    /// <summary>
-    /// Restore window state from saved state
-    /// </summary>
-    private void RestoreWindowState()
-{
-        if (_lastWindowState != null)
-        {
-            var state = _lastWindowState;
-            
-            // Restore position and size
-            this.Left = state.Left;
-            this.Top = state.Top;
-            this.Width = state.Width;
-            this.Height = state.Height;
-            
-            // Restore maximized state if needed
-            if (state.IsMaximized)
-            {
-                this.WindowState = WindowState.Maximized;
-            }
-            
-            _logger.LogInformation("Restored window state: {Width}x{Height}", 
-                state.Width, state.Height);
-        }
-}
 
     /// <summary>
     /// Notify property changed for window properties

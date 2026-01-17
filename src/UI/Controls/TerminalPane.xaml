@@ -35,17 +35,29 @@
                                FontWeight="Normal"/>
                 </StackPanel>
 
-                <!-- Disconnect Button -->
-                <Button x:Name="DisconnectButton"
-                        Grid.Column="1"
-                        Content="Disconnect"
-                        Margin="8,4"
-                        Padding="8,2"
-                        Background="#C0392B"
-                        Foreground="White"
-                        BorderThickness="0"
-                        Visibility="Collapsed"
-                        Click="DisconnectButton_Click"/>
+                <!-- Header Buttons -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <!-- Settings Button -->
+                    <Button x:Name="SettingsButton"
+                            Content="Settings"
+                            Margin="4,4"
+                            Padding="8,2"
+                            Background="#3C3C3C"
+                            Foreground="#CCCCCC"
+                            BorderThickness="0"
+                            Click="SettingsButton_Click"/>
+
+                    <!-- Disconnect Button -->
+                    <Button x:Name="DisconnectButton"
+                            Content="Disconnect"
+                            Margin="4,4"
+                            Padding="8,2"
+                            Background="#C0392B"
+                            Foreground="White"
+                            BorderThickness="0"
+                            Visibility="Collapsed"
+                            Click="DisconnectButton_Click"/>
+                </StackPanel>
             </Grid>
 
             <!-- Connection Bar -->

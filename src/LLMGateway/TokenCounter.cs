@@ -70,7 +70,7 @@ public class TokenCountResult
 public class TokenCounter
 {
     private readonly ConcurrentDictionary<string, int> _cache;
-    private readonly TokenizerType _defaultTokenizer;
+    private TokenizerType _defaultTokenizer;
     private readonly ILogger<TokenCounter> _logger;
 
     /// <summary>
@@ -177,7 +177,7 @@ public class TokenCounter
         var effectiveTokenizer = tokenizer ?? _defaultTokenizer;
 
         var contextTokens = messages.Sum(m => CountTokens(m.Content, effectiveTokenizer));
-        var systemTokens = messages.Where(m => m.Role == "system")
+        var systemTokens = messages.Where(m => m.Role == Models.MessageRole.System)
                                       .Sum(m => CountTokens(m.Content, effectiveTokenizer));
 
         return new TokenCountResult

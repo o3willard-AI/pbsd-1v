@@ -22,13 +22,13 @@
             <Style x:Key="ColorConverter" TargetType="SolidColorBrush">
                 <Style.Triggers>
                     <DataTrigger Binding="{Binding Percentage, Converter={StaticResource PercentageToDoubleConverter}}" Value="0.0">
-                        <Setter Property="Background" Value="{StaticResource MeterSafeColor}" />
+                        <Setter Property="Color" Value="Green" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding Percentage, Converter={StaticResource PercentageToDoubleConverter}}" Value="0.7">
-                        <Setter Property="Background" Value="{StaticResource MeterWarningColor}" />
+                        <Setter Property="Color" Value="Yellow" />
                     </DataTrigger>
                     <DataTrigger Binding="{Binding Percentage, Converter={StaticResource PercentageToDoubleConverter}}" Value="0.9">
-                        <Setter Property="Background" Value="{StaticResource MeterCriticalColor}" />
+                        <Setter Property="Color" Value="Red" />
                     </DataTrigger>
                 </Style.Triggers>
             </Style>
@@ -55,7 +55,7 @@
                            VerticalAlignment="Center" />
 
                 <TextBlock Grid.Column="1"
-                           Text="{Binding FormattedMaxTokens, StringFormat='{0}'}"
+                           Text="{Binding FormattedMaxTokens}"
                            FontSize="11"
                            Foreground="{StaticResource TextSecondary}"
                            VerticalAlignment="Center"
@@ -103,7 +103,7 @@
                                VerticalAlignment="Center"
                                Margin="4,0,0,0">
                         <TextBlock.Style>
-                            <Style TargetType="TextBlock" TargetType="{x:Type TextBlock}">
+                            <Style TargetType="TextBlock">
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding Status}" Value="Critical">
                                         <Setter Property="Foreground" Value="{StaticResource MeterCriticalColor}" />
@@ -113,7 +113,8 @@
                                     </DataTrigger>
                                 </Style.Triggers>
                             </Style>
-                        </TextBlock>
+                        </TextBlock.Style>
+                    </TextBlock>
                 </Grid>
             </Border>
 
@@ -152,8 +153,8 @@
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
-                    </TextBlock>
-                </Grid>
+                    </TextBlock.Style>
+                </TextBlock>
             </Grid>
         </StackPanel>
 

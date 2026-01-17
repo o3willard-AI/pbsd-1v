@@ -25,7 +25,7 @@ public class ClearCommandHandler : CommandHandlerBase
         MinArguments = 0,
         MaxArguments = 1,
         Aliases = ["cls", "reset"]
-    }
+    };
 
     public override bool CanExecute(CommandContext context)
     {

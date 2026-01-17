@@ -46,8 +46,8 @@ public class CommandDispatcher
     /// Initializes a new instance with default implementations
     /// </summary>
     public CommandDispatcher(ILogger<CommandDispatcher> logger) : this(
-        new CommandRegistry(logger),
-        new SlashCommandParser(logger),
+        new CommandRegistry(Microsoft.Extensions.Logging.Abstractions.NullLogger<CommandRegistry>.Instance),
+        new SlashCommandParser(null),
         logger)
     {
     }
@@ -121,7 +121,7 @@ public class CommandDispatcher
 
         if (!_parser.ValidateArguments(parsed, metadata))
         {
-            var result = _parser.InvalidArguments(parsed.CommandName, metadata.Syntax);
+            var result = CommandResult.InvalidArguments(parsed.CommandName, metadata.Syntax);
             _logger.LogWarning($"Invalid arguments for /{metadata.Name}");
             CommandError?.Invoke(this, result);
             CommandExecuted?.Invoke(this, result);

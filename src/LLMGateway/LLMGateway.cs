@@ -182,8 +182,9 @@ public class LLMGateway
             throw new LLMNoActiveProviderException();
         }
 
-        if (!_request.IsValid(out var errorMessage))
+        if (!request.IsValid())
         {
+            request.Validate(out var errorMessage);
             throw new LLMConfigurationException($"Invalid request: {errorMessage}");
         }
 
@@ -224,8 +225,9 @@ public class LLMGateway
                 $"Provider '{ActiveProviderId}' does not support streaming");
         }
 
-        if (!_request.IsValid(out var errorMessage))
+        if (!request.IsValid())
         {
+            request.Validate(out var errorMessage);
             throw new LLMConfigurationException($"Invalid request: {errorMessage}");
         }
 
@@ -236,10 +238,14 @@ public class LLMGateway
         var retries = GetActiveConfiguration()?.MaxRetries ?? 3;
         var attempt = 0;
         var success = false;
+        var responses = new List<StreamingCompletionResponse>();
         StreamingCompletionResponse? lastError = null;
+        bool shouldBreak = false;
 
-        while (attempt < retries && !success && !cancellationToken.IsCancellationRequested)
+        while (attempt < retries && !success && !cancellationToken.IsCancellationRequested && !shouldBreak)
         {
+            responses.Clear();
+
             try
             {
                 attempt++;
@@ -248,7 +254,7 @@ public class LLMGateway
                     cancellationToken))
                 {
                     StreamingChunkReceived?.Invoke(this, chunk);
-                    yield return chunk;
+                    responses.Add(chunk);
 
                     if (chunk.IsComplete)
                     {
@@ -274,12 +280,18 @@ public class LLMGateway
                 lastError = StreamingCompletionResponse.Error(ex.Message);
                 ErrorOccurred?.Invoke(this, new LLMGatewayException(
                     $"Streaming failed: {ex.Message}", ex));
-                yield return lastError;
-                yield break;
+                responses.Add(lastError);
+                shouldBreak = true;
+            }
+
+            // Yield collected responses outside try-catch
+            foreach (var response in responses)
+            {
+                yield return response;
             }
         }
 
-        if (!success && lastError != null)
+        if (!success && lastError != null && !shouldBreak)
         {
             yield return lastError;
         }
@@ -392,11 +404,13 @@ public class LLMGateway
 
         if (lastException != null)
         {
-            ErrorOccurred?.Invoke(this, lastException);
-            throw lastException;
+            var gatewayException = lastException as LLMGatewayException
+                ?? new LLMGatewayException(lastException.Message, lastException);
+            ErrorOccurred?.Invoke(this, gatewayException);
+            throw gatewayException;
         }
 
-        throw new LLMGatewayException("Retry limit exceeded", lastException);
+        throw new LLMGatewayException("Retry limit exceeded");
     }
 
     private TimeSpan CalculateBackoffDelay(int attempt)

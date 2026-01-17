@@ -44,7 +44,7 @@
                                FontSize="10"
                                FontWeight="Bold"
                                Foreground="{StaticResource LanguageTagForeground}"
-                               TextTransform="Uppercase" />
+                               />
                 </Border>
 
                 <!-- Copy Button -->

@@ -1,17 +1,19 @@
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 
 namespace PairAdmin.DataStructures;
 
 /// <summary>
 /// Circular buffer for storing terminal output with fixed capacity
-/// Thread-safe implementation using lock-free ConcurrentQueue for optimal performance
+/// Thread-safe implementation using lock for thread safety
 /// </summary>
 /// <typeparam name="T">Type of items in the buffer</typeparam>
 public class CircularBuffer<T> : IDisposable
 {
-    private readonly ConcurrentQueue<T> _buffer;
+    private readonly T[] _buffer;
     private readonly int _capacity;
+    private int _head;
+    private int _tail;
     private int _count;
     private readonly object _syncLock = new object();
 
@@ -26,8 +28,10 @@ public class CircularBuffer<T> : IDisposable
             throw new ArgumentOutOfRangeException(nameof(capacity), "Capacity must be positive");
         }
 
-        _buffer = new ConcurrentQueue<T>(capacity, capacity);
+        _buffer = new T[capacity];
         _capacity = capacity;
+        _head = 0;
+        _tail = 0;
         _count = 0;
     }
 
@@ -36,36 +40,39 @@ public class CircularBuffer<T> : IDisposable
     /// </summary>
     public CircularBuffer() : this(100)
     {
-        _buffer = new ConcurrentQueue<T>(100);
-        _capacity = 100;
-        _count = 0;
     }
 
     /// <summary>
     /// Gets the current number of items in the buffer
     /// </summary>
-    /// <returns>Current count of items</returns>
     public int Count
     {
-        return _count;
+        get
+        {
+            lock (_syncLock)
+            {
+                return _count;
+            }
+        }
     }
 
     /// <summary>
     /// Gets the capacity of the buffer
     /// </summary>
-    /// <returns>Maximum number of items buffer can hold</returns>
-    public int Capacity
-    {
-        return _capacity;
-    }
+    public int Capacity => _capacity;
 
     /// <summary>
     /// Gets whether the buffer is empty
     /// </summary>
-    /// <returns>True if buffer has no items</returns>
     public bool IsEmpty
     {
-        return _count == 0;
+        get
+        {
+            lock (_syncLock)
+            {
+                return _count == 0;
+            }
+        }
     }
 
     /// <summary>
@@ -74,24 +81,20 @@ public class CircularBuffer<T> : IDisposable
     /// <param name="item">Item to add</param>
     public void Add(T item)
     {
-        if (item == null)
-        {
-            throw new ArgumentNullException(nameof(item));
-        }
-
         lock (_syncLock)
         {
-            while (_buffer.Count >= _capacity)
-            {
-                if (!_buffer.TryDequeue(out _))
-                {
-                    throw new InvalidOperationException("Failed to remove item from full buffer");
-                }
-                _count--;
-            }
+            _buffer[_tail] = item;
+            _tail = (_tail + 1) % _capacity;
 
-            _buffer.Enqueue(item);
-            _count++;
+            if (_count == _capacity)
+            {
+                // Buffer is full, overwrite oldest
+                _head = (_head + 1) % _capacity;
+            }
+            else
+            {
+                _count++;
+            }
         }
     }
 
@@ -119,12 +122,9 @@ public class CircularBuffer<T> : IDisposable
     {
         lock (_syncLock)
         {
-            while (_buffer.TryDequeue(out _))
-            {
-                // Item is dequeued and discarded
-            }
-            
-            _buffer.Clear();
+            Array.Clear(_buffer, 0, _capacity);
+            _head = 0;
+            _tail = 0;
             _count = 0;
         }
     }
@@ -132,196 +132,146 @@ public class CircularBuffer<T> : IDisposable
     /// <summary>
     /// Removes and returns the oldest item from the buffer
     /// </summary>
-    /// <returns>Oldest item, or default if buffer is empty</returns>
-    public T TryDequeue()
+    /// <param name="item">The dequeued item</param>
+    /// <returns>True if an item was dequeued, false if buffer was empty</returns>
+    public bool TryDequeue(out T? item)
     {
-        if (_buffer.TryDequeue(out var item))
+        lock (_syncLock)
         {
-            if (item != null)
+            if (_count == 0)
             {
-                lock (_syncLock)
-                {
-                    _count--;
-                }
+                item = default;
+                return false;
             }
-            
-            return item;
+
+            item = _buffer[_head];
+            _buffer[_head] = default!;
+            _head = (_head + 1) % _capacity;
+            _count--;
+            return true;
         }
-        
-        return default;
     }
 
     /// <summary>
-    /// Returns the newest items without removing them (peek operation)
+    /// Returns the oldest item without removing it
     /// </summary>
-    /// <returns>Newest item(s), or empty if buffer is empty</returns>
-    public T[] TryPeek(int count)
+    /// <param name="item">The peeked item</param>
+    /// <returns>True if an item was peeked, false if buffer was empty</returns>
+    public bool TryPeek(out T? item)
     {
-        if (count <= 0 || count > _count)
+        lock (_syncLock)
         {
-            count = _count;
+            if (_count == 0)
+            {
+                item = default;
+                return false;
+            }
+
+            item = _buffer[_head];
+            return true;
         }
-
-        if (_buffer.Count == 0)
-        {
-            return Array.Empty<T>();
-        }
-
-        var items = new T[count];
-        _buffer.TryPeek(items);
-
-        return items;
     }
 
     /// <summary>
-    /// Returns the oldest items without removing them (peek from beginning)
+    /// Returns items from the buffer without removing them
     /// </summary>
     /// <param name="count">Number of items to return</param>
-    /// <returns>Oldest item(s), or empty if buffer is empty</returns>
-    public T[] TryPeekFromStart(int count)
+    /// <returns>Array of items (oldest first)</returns>
+    public T[] Peek(int count)
     {
-        if (count <= 0 || count > _count)
+        lock (_syncLock)
         {
-            count = _count;
-        }
-
-        if (_buffer.Count == 0)
-        {
-            return Array.Empty<T>();
-        }
-
-        var items = new T[count];
-        _buffer.TryPeek(items);
-
-        return items;
-    }
-
-    /// <summary>
-    /// Removes and returns the oldest item from the buffer
-    /// </summary>
-    /// <returns>Oldest item, or default if buffer is empty</returns>
-    public bool TryRemoveOldest()
-    {
-        if (_buffer.TryDequeue(out var item))
-        {
-            if (item != null)
+            if (count <= 0 || count > _count)
             {
-                lock (_syncLock)
-                {
-                    _count--;
-                }
-            
-                return true;
+                count = _count;
             }
-        }
-        
-        return false;
-    }
 
-    /// <summary>
-    /// Removes and returns the newest item from the buffer
-    /// </summary>
-    /// <returns>Newest item, or default if buffer is empty</returns>
-    public T TryRemoveNewest()
-    {
-        if (_buffer.TryDequeue(out var item))
-        {
-            if (item != null)
+            var items = new T[count];
+            for (int i = 0; i < count; i++)
             {
-                lock (_syncLock)
-                {
-                    _count--;
-                }
-            
-                return true;
+                items[i] = _buffer[(_head + i) % _capacity];
             }
+            return items;
         }
-        
-        return false;
     }
 
     /// <summary>
-    /// Removes the newest item from the buffer
+    /// Returns items from the start of the buffer without removing them (alias for Peek)
     /// </summary>
-    /// <param name="item">Item to remove</param>
-    /// <returns>True if item was removed, false otherwise</returns>
-    public bool TryRemove(T item)
-    {
-        // Not supported on circular buffer with FIFO semantics
-        return false;
-    }
+    /// <param name="count">Number of items to return</param>
+    /// <returns>Array of items (oldest first)</returns>
+    public T[] TryPeekFromStart(int count) => Peek(count);
 
     /// <summary>
     /// Converts the buffer contents to an array
     /// </summary>
-    /// <returns>Array of all items in buffer (in order from oldest to newest)</returns>
+    /// <returns>Array of all items in buffer (oldest to newest)</returns>
     public T[] ToArray()
     {
-        var items = new T[_count];
-        _buffer.TryDequeue(items);
-        return items;
+        lock (_syncLock)
+        {
+            var items = new T[_count];
+            for (int i = 0; i < _count; i++)
+            {
+                items[i] = _buffer[(_head + i) % _capacity];
+            }
+            return items;
+        }
     }
 
     /// <summary>
     /// Converts the buffer contents to a list
     /// </summary>
-    /// <returns>List of all items in buffer (in order from oldest to newest)</returns>
+    /// <returns>List of all items in buffer (oldest to newest)</returns>
     public List<T> ToList()
     {
-        var list = new List<T>(_count);
-        _buffer.TryDequeue(list);
-        return list;
+        lock (_syncLock)
+        {
+            var list = new List<T>(_count);
+            for (int i = 0; i < _count; i++)
+            {
+                list.Add(_buffer[(_head + i) % _capacity]);
+            }
+            return list;
+        }
     }
 
     /// <summary>
-    /// Performs the specified action on each item and clears the buffer
+    /// Performs the specified action on each item
     /// </summary>
     /// <param name="action">Action to perform on each item</param>
     public void ForEach(Action<T> action)
     {
+        if (action == null)
+        {
+            throw new ArgumentNullException(nameof(action));
+        }
+
         lock (_syncLock)
         {
-            var count = _count;
-            while (count-- > 0 && _buffer.TryDequeue(out var item))
+            for (int i = 0; i < _count; i++)
             {
-                action(item);
+                action(_buffer[(_head + i) % _capacity]);
             }
-        }
         }
     }
 
     /// <summary>
-    /// Performs the specified action on each item and removes them
+    /// Extracts all items and clears the buffer
     /// </summary>
-    /// <param name="action">Action to perform on each item</param>
-    /// <returns>List of processed items in order from oldest to newest</returns>
+    /// <returns>List of all items that were in the buffer</returns>
     public List<T> ExtractAndClear()
     {
-        var list = new List<T>();
-        
         lock (_syncLock)
         {
-            var count = _count;
-            while (count-- > 0 && _buffer.TryDequeue(out var item))
+            var list = new List<T>(_count);
+            for (int i = 0; i < _count; i++)
             {
-                action(item);
-                list.Add(item);
+                list.Add(_buffer[(_head + i) % _capacity]);
             }
+            Clear();
+            return list;
         }
-        }
-        
-        return list;
-    }
-
-    /// <summary>
-    /// Creates a snapshot of the buffer contents without clearing
-    /// </summary>
-    /// <returns>Array of all items in buffer (in order from oldest to newest)</returns>
-    public T[] ToArray()
-    {
-        var items = new T[_count];
-        _buffer.TryDequeue(items);
-        return items;
     }
 
     /// <summary>
@@ -329,7 +279,6 @@ public class CircularBuffer<T> : IDisposable
     /// </summary>
     public void Dispose()
     {
-        _buffer.Clear();
-        _count = 0;
+        Clear();
     }
 }

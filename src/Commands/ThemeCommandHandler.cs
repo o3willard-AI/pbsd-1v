@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace PairAdmin.Commands;
@@ -39,12 +40,12 @@ public class ThemeCommandHandler : CommandHandlerBase
     {
         if (command.Arguments.Count == 0 && command.Flags.Count == 0)
         {
-            return ShowCurrentTheme();
+            return ShowCurrentTheme(context);
         }
 
         if (command.Flags.TryGetValue("font-size", out var fontSizeStr))
         {
-            return SetFontSize(fontSizeStr);
+            return SetFontSize(context, fontSizeStr);
         }
 
         if (command.Arguments.Count > 0)
@@ -53,11 +54,11 @@ public class ThemeCommandHandler : CommandHandlerBase
 
             return arg switch
             {
-                "show" => ShowCurrentTheme(),
-                "light" => SetThemeMode(Configuration.ThemeMode.Light),
-                "dark" => SetThemeMode(Configuration.ThemeMode.Dark),
-                "system" => SetThemeMode(Configuration.ThemeMode.System),
-                _ when arg.StartsWith("#") => SetAccentColor(arg),
+                "show" => ShowCurrentTheme(context),
+                "light" => SetThemeMode(context, Configuration.ThemeMode.Light),
+                "dark" => SetThemeMode(context, Configuration.ThemeMode.Dark),
+                "system" => SetThemeMode(context, Configuration.ThemeMode.System),
+                _ when arg.StartsWith("#") => SetAccentColor(context, arg),
                 _ => InvalidArguments("/theme [show|light|dark|system|#RRGGBB|--font-size <size>]")
             };
         }
@@ -65,7 +66,7 @@ public class ThemeCommandHandler : CommandHandlerBase
         return InvalidArguments("/theme [show|light|dark|system|<accent-color>|--font-size <size>]");
     }
 
-    private CommandResult ShowCurrentTheme()
+    private CommandResult ShowCurrentTheme(CommandContext context)
     {
         var settings = context.Settings;
         var theme = settings.Theme ?? new Configuration.ThemeSettings();
@@ -94,7 +95,7 @@ public class ThemeCommandHandler : CommandHandlerBase
         return Success(sb.ToString());
     }
 
-    private CommandResult SetThemeMode(Configuration.ThemeMode mode)
+    private CommandResult SetThemeMode(CommandContext context, Configuration.ThemeMode mode)
     {
         try
         {
@@ -123,7 +124,7 @@ public class ThemeCommandHandler : CommandHandlerBase
         }
     }
 
-    private CommandResult SetAccentColor(string color)
+    private CommandResult SetAccentColor(CommandContext context, string color)
     {
         if (!IsValidColor(color))
         {
@@ -152,7 +153,7 @@ public class ThemeCommandHandler : CommandHandlerBase
         }
     }
 
-    private CommandResult SetFontSize(string fontSizeStr)
+    private CommandResult SetFontSize(CommandContext context, string fontSizeStr)
     {
         if (!int.TryParse(fontSizeStr, out var fontSize) || fontSize < 8 || fontSize > 72)
         {

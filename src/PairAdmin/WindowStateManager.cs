@@ -1,3 +1,4 @@
+using System.Windows;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -37,7 +38,7 @@ public class WindowStateManager
             return;
         }
 
-        var state = new WindowState
+        var state = new SavedWindowState
         {
             Width = window.ActualWidth,
             Height = window.ActualHeight,
@@ -78,5 +79,17 @@ public class WindowStateManager
 /// </summary>
 public class WindowStateOptions
 {
-    public WindowState? WindowState { get; set; }
+    public SavedWindowState? WindowState { get; set; }
+}
+
+/// <summary>
+/// Saved window state
+/// </summary>
+public class SavedWindowState
+{
+    public double Width { get; set; }
+    public double Height { get; set; }
+    public double Left { get; set; }
+    public double Top { get; set; }
+    public bool IsMaximized { get; set; }
 }

@@ -1,8 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-
 using Microsoft.Extensions.Logging;
+using PairAdmin.DataStructures;
 
 namespace PairAdmin.Context;
 
@@ -12,13 +12,13 @@ namespace PairAdmin.Context;
 public class SlidingWindowBuffer
 {
     private readonly CircularBuffer<string> _buffer;
-    private readonly ILogger<SlidingWindowBuffer> _logger;
+    private readonly ILogger _logger;
     private readonly int _maxLines;
 
     /// <summary>
     /// Initializes a new instance of sliding window buffer
     /// </summary>
-    public SlidingWindowBuffer(ILogger<SlidingWindowBuffer> logger, int maxLines = 100)
+    public SlidingWindowBuffer(ILogger logger, int maxLines = 100)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _buffer = new CircularBuffer<string>(maxLines);
@@ -95,19 +95,13 @@ public class SlidingWindowBuffer
     /// Gets the current number of lines in the buffer
     /// </summary>
     /// <returns>Current line count</returns>
-    public int LineCount
-    {
-        return _buffer.Count;
-    }
+    public int LineCount => _buffer.Count;
 
     /// <summary>
     /// Gets the maximum number of lines the buffer can hold
     /// </summary>
     /// <returns>Maximum capacity</returns>
-    public int MaxLines
-    {
-        return _maxLines;
-    }
+    public int MaxLines => _maxLines;
 
     /// <summary>
     /// Gets the context string for the last N lines (for LLM prompt)

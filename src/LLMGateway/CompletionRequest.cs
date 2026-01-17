@@ -131,6 +131,11 @@ public class CompletionRequest
     }
 
     /// <summary>
+    /// Gets whether the request is valid
+    /// </summary>
+    public bool IsValid() => Validate(out _);
+
+    /// <summary>
     /// Validates the request
     /// </summary>
     public bool Validate(out string? errorMessage)

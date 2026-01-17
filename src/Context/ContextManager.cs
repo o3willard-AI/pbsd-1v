@@ -51,7 +51,7 @@ public class ContextManager : IContextProvider
 {
     private readonly SlidingWindowBuffer _buffer;
     private readonly IContextTokenCounter _tokenCounter;
-    private readonly IContextCache _cache;
+    private IContextCache _cache;
     private readonly ContextWindowConfig _config;
     private readonly ContextMetadata _metadata;
     private readonly ILogger<ContextManager> _logger;

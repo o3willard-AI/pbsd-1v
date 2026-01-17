@@ -1,4 +1,6 @@
+using System.Text;
 using Microsoft.Extensions.Logging;
+using PairAdmin.Context;
 
 namespace PairAdmin.Commands;
 
@@ -27,7 +29,7 @@ public class ContextCommandHandler : CommandHandlerBase
         MinArguments = 0,
         MaxArguments = 1,
         Aliases = ["ctx", "window"]
-    }
+    };
 
     public override bool CanExecute(CommandContext context)
     {
@@ -116,8 +118,12 @@ public class ContextCommandHandler : CommandHandlerBase
 
         try
         {
-            context.ContextManager.MaxLines = lines;
-            context.ContextManager.Policy = ContextSizePolicy.Fixed;
+            var settings = new ContextWindowSettings
+            {
+                SizeMode = ContextSizeMode.Fixed,
+                MaxLines = lines
+            };
+            context.ContextManager!.UpdatePolicy(settings);
 
             _logger.LogInformation("Set context max lines to {Lines}", lines);
 
@@ -145,8 +151,7 @@ public class ContextCommandHandler : CommandHandlerBase
 
         try
         {
-            context.ContextManager.SetPercentage(percentage);
-            context.ContextManager.Policy = ContextSizePolicy.Percentage;
+            context.ContextManager!.SetPercentage(percentage / 100.0);
 
             _logger.LogInformation("Set context percentage to {Percentage}%", percentage);
 
@@ -169,7 +174,11 @@ public class ContextCommandHandler : CommandHandlerBase
     {
         try
         {
-            context.ContextManager.Policy = ContextSizePolicy.Auto;
+            var settings = new ContextWindowSettings
+            {
+                SizeMode = ContextSizeMode.Auto
+            };
+            context.ContextManager!.UpdatePolicy(settings);
 
             _logger.LogInformation("Set context policy to Auto");
 

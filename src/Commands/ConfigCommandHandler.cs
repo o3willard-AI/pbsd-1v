@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.IO;
+using System.Text;
 using Microsoft.Extensions.Logging;
 
 namespace PairAdmin.Commands;

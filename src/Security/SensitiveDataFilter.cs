@@ -127,10 +127,9 @@ public class SensitiveDataFilter
     {
         return new Chat.ChatMessage
         {
-            Role = message.Role,
+            Sender = message.Sender,
             Content = Filter(message.Content),
-            Timestamp = message.Timestamp,
-            Metadata = message.Metadata
+            Timestamp = message.Timestamp
         };
     }
 

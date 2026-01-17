@@ -445,7 +445,7 @@ public class WorkingDirectoryTracker
         }
         else if (trimmed == "pushd")
         {
-            Pushd(dir: _state.CurrentDirectory);
+            Pushd(directory: _state.CurrentDirectory);
         }
         else if (trimmed == "popd")
         {

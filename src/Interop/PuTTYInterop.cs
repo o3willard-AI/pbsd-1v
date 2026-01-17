@@ -14,13 +14,49 @@ public static class PuTTYInterop
     /// <summary>
     /// PairAdmin event types for terminal I/O
     /// </summary>
-    public enum PairAdminEventType : byte
+    public enum PairAdminEventType : int
     {
         /// <summary>Terminal output from SSH server (after processing)</summary>
         Output = 1,
 
         /// <summary>Terminal input from user (before transmission)</summary>
-        Input = 2
+        Input = 2,
+
+        /// <summary>Connection established</summary>
+        Connected = 3,
+
+        /// <summary>Connection closed</summary>
+        Disconnected = 4,
+
+        /// <summary>Error occurred</summary>
+        Error = 5
+    }
+
+    /// <summary>
+    /// PairAdmin state for integrated mode
+    /// </summary>
+    public enum PairAdminState : int
+    {
+        /// <summary>Not initialized</summary>
+        NotInitialized = 0,
+
+        /// <summary>Initializing</summary>
+        Initializing = 1,
+
+        /// <summary>Ready for connection</summary>
+        Ready = 2,
+
+        /// <summary>Connection in progress</summary>
+        Connecting = 3,
+
+        /// <summary>Connected to SSH server</summary>
+        Connected = 4,
+
+        /// <summary>Disconnecting</summary>
+        Disconnecting = 5,
+
+        /// <summary>Error state</summary>
+        Error = -1
     }
 
     /// <summary>
@@ -87,6 +123,33 @@ public static class PuTTYInterop
     /// <returns>1 if connected, 0 if not</returns>
     [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
     public static extern int pairadmin_is_connected();
+
+    /// <summary>
+    /// Get current state of the PairAdmin system
+    /// </summary>
+    /// <returns>Current state</returns>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
+    public static extern PairAdminState pairadmin_get_state();
+
+    /// <summary>
+    /// Get last error message
+    /// </summary>
+    /// <returns>Pointer to error string (may be null)</returns>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr pairadmin_get_error();
+
+    /// <summary>
+    /// Shutdown and cleanup the PairAdmin system
+    /// </summary>
+    /// <returns>0 on success</returns>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
+    public static extern int pairadmin_shutdown();
+
+    /// <summary>
+    /// Get the DLL debug log file path
+    /// </summary>
+    [DllImport("PairAdminPuTTY", CallingConvention = CallingConvention.Cdecl)]
+    private static extern IntPtr pairadmin_get_log_path();
 
     #endregion
 
@@ -237,11 +300,56 @@ public static class PuTTYInterop
     public static bool IsConnected => pairadmin_is_connected() != 0;
 
     /// <summary>
+    /// Get current state of the PairAdmin system
+    /// </summary>
+    public static PairAdminState State => pairadmin_get_state();
+
+    /// <summary>
+    /// Get last error message from PairAdmin
+    /// </summary>
+    /// <returns>Error message or null if no error</returns>
+    public static string? GetErrorMessage()
+    {
+        IntPtr errorPtr = pairadmin_get_error();
+        if (errorPtr == IntPtr.Zero)
+            return null;
+        return Marshal.PtrToStringAnsi(errorPtr);
+    }
+
+    /// <summary>
+    /// Shutdown and cleanup the PairAdmin system
+    /// </summary>
+    /// <returns>True if shutdown was successful</returns>
+    public static bool Shutdown()
+    {
+        int result = pairadmin_shutdown();
+        return result == 0;
+    }
+
+    /// <summary>
     /// Get the terminal window handle from the integrated PuTTY
     /// </summary>
     public static IntPtr GetTerminalHandle()
     {
         return pairadmin_get_terminal_hwnd();
+    }
+
+    /// <summary>
+    /// Get the DLL debug log file path
+    /// </summary>
+    public static string? GetDllLogPath()
+    {
+        try
+        {
+            IntPtr pathPtr = pairadmin_get_log_path();
+            if (pathPtr == IntPtr.Zero)
+                return null;
+            return Marshal.PtrToStringAnsi(pathPtr);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     /// <summary>

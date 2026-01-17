@@ -92,6 +92,21 @@ public interface IContextCache
     /// <param name="cacheKey">Cache key</param>
     /// <returns>Cache hit info or null if not found</returns>
     CacheHitInfo? GetCacheHitInfo(string cacheKey);
+
+    /// <summary>
+    /// Number of cache hits
+    /// </summary>
+    int HitCount { get; }
+
+    /// <summary>
+    /// Number of cache misses
+    /// </summary>
+    int MissCount { get; }
+
+    /// <summary>
+    /// Cache hit rate (0.0 - 1.0)
+    /// </summary>
+    double HitRate { get; }
 }
 
 /// <summary>

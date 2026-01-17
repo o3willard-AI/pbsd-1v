@@ -14,6 +14,67 @@ using PairAdmin.UI.Dialogs;
 
 namespace PairAdmin.UI.Controls;
 
+/// <summary>
+/// Simple file logger for debugging TerminalPane
+/// </summary>
+internal static class TerminalDebugLog
+{
+    private static readonly object _lock = new();
+    private static StreamWriter? _writer;
+    private static string? _logPath;
+
+    public static string? LogPath => _logPath;
+
+    public static void Initialize()
+    {
+        if (_writer != null) return;
+
+        try
+        {
+            var logDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "PairAdmin");
+            Directory.CreateDirectory(logDir);
+
+            _logPath = Path.Combine(logDir, "pairadmin_csharp.log");
+            _writer = new StreamWriter(_logPath, append: true) { AutoFlush = true };
+
+            Log("========================================");
+            Log($"PairAdmin C# Log Started: {DateTime.Now}");
+            Log($"Process ID: {Environment.ProcessId}");
+            Log("========================================");
+        }
+        catch { }
+    }
+
+    public static void Log(string message)
+    {
+        try
+        {
+            lock (_lock)
+            {
+                _writer?.WriteLine($"[{DateTime.Now:HH:mm:ss.fff}] {message}");
+            }
+        }
+        catch { }
+    }
+
+    public static void LogException(Exception ex, string context)
+    {
+        Log($"EXCEPTION in {context}: {ex.GetType().Name}: {ex.Message}");
+        Log($"  Stack: {ex.StackTrace}");
+    }
+
+    public static void Close()
+    {
+        lock (_lock)
+        {
+            _writer?.Close();
+            _writer = null;
+        }
+    }
+}
+
 public partial class TerminalPane : UserControl, IDisposable
 {
     private readonly ILogger<TerminalPane> _logger;
@@ -42,16 +103,24 @@ public partial class TerminalPane : UserControl, IDisposable
 
     public TerminalPane(ILogger<TerminalPane> logger)
     {
+        TerminalDebugLog.Initialize();
+        TerminalDebugLog.Log("TerminalPane constructor called");
+
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _settings = TerminalSettings.Load();
+        TerminalDebugLog.Log($"Settings loaded: Mode={_settings.Mode}");
+
         InitializeComponent();
         Loaded += OnLoaded;
         Unloaded += OnUnloaded;
         SizeChanged += OnSizeChanged;
+
+        TerminalDebugLog.Log("TerminalPane constructor complete");
     }
 
     private void InitializeTerminal()
     {
+        TerminalDebugLog.Log("InitializeTerminal called");
         _logger.LogInformation("Initializing TerminalPane");
 
         // Check settings on first load
@@ -160,10 +229,40 @@ public partial class TerminalPane : UserControl, IDisposable
         Disconnect();
     }
 
+    private void SettingsButton_Click(object sender, RoutedEventArgs e)
+    {
+        // Disconnect first if connected
+        if (_isConnected)
+        {
+            var result = MessageBox.Show(
+                "Changing settings will disconnect the current session.\n\nContinue?",
+                "Disconnect Required",
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+
+            if (result != MessageBoxResult.Yes)
+                return;
+
+            Disconnect();
+        }
+
+        // Show the terminal setup dialog
+        var dialogResult = TerminalSetupDialog.ShowSetupDialog();
+        if (dialogResult.HasValue)
+        {
+            _settings = TerminalSettings.Load();
+            UpdateModeIndicator();
+            _logger.LogInformation("Terminal mode changed to: {Mode}", _settings.Mode);
+        }
+    }
+
     #region Integrated Mode (PairAdminPuTTY.dll)
 
     private void ConnectIntegrated(string hostname, int port, string username)
     {
+        TerminalDebugLog.Log("=== ConnectIntegrated START ===");
+        TerminalDebugLog.Log($"hostname={hostname} port={port} username={username}");
+
         if (_isConnected) Disconnect();
         _logger.LogInformation("Connecting via integrated PuTTY to {Hostname}:{Port}", hostname, port);
 
@@ -171,8 +270,12 @@ public partial class TerminalPane : UserControl, IDisposable
         {
             // Check if DLL exists
             var dllPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "PairAdminPuTTY.dll");
+            TerminalDebugLog.Log($"DLL path: {dllPath}");
+            TerminalDebugLog.Log($"DLL exists: {File.Exists(dllPath)}");
+
             if (!File.Exists(dllPath))
             {
+                TerminalDebugLog.Log("ERROR: DLL not found");
                 MessageBox.Show(
                     "Integrated PuTTY library (PairAdminPuTTY.dll) not found.\n\n" +
                     "Please reinstall PairAdmin or switch to External PuTTY mode.",
@@ -183,61 +286,78 @@ public partial class TerminalPane : UserControl, IDisposable
             }
 
             // Register callback for terminal I/O
+            TerminalDebugLog.Log("Registering callback");
             _callbackDelegate = OnPuTTYCallback;
             PuTTYInterop.RegisterCallback(_callbackDelegate);
 
-            // Initialize integrated PuTTY (required before connect)
+            // Get the WPF window handle for embedding
             var wpfHandle = GetWpfWindowHandle();
+            TerminalDebugLog.Log($"WPF window handle: {wpfHandle}");
+
+            // Initialize integrated PuTTY with parent window for embedding
+            TerminalDebugLog.Log("Calling PuTTYInterop.Initialize()");
+            _logger.LogDebug("Initializing integrated PuTTY with parent HWND: {Handle}", wpfHandle);
             if (!PuTTYInterop.Initialize(wpfHandle))
             {
-                _logger.LogWarning("Integrated PuTTY initialization failed, falling back to external");
+                var errorMsg = PuTTYInterop.GetErrorMessage() ?? "Unknown error";
+                TerminalDebugLog.Log($"ERROR: Initialize failed: {errorMsg}");
+                TerminalDebugLog.Log($"DLL log path: {PuTTYInterop.GetDllLogPath()}");
+                _logger.LogWarning("Integrated PuTTY initialization failed: {Error}", errorMsg);
                 MessageBox.Show(
-                    "Integrated PuTTY initialization failed.\n\n" +
-                    "This is expected - full DLL integration is still in development.\n" +
-                    "Falling back to External PuTTY mode.",
-                    "Integration Not Available",
+                    $"Integrated PuTTY initialization failed:\n{errorMsg}\n\n" +
+                    $"Check log file: {PuTTYInterop.GetDllLogPath()}",
+                    "Integration Error",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                ConnectExternal(hostname, port, username);
+                    MessageBoxImage.Warning);
                 return;
             }
 
+            TerminalDebugLog.Log($"Initialize succeeded, state: {PuTTYInterop.State}");
+            _logger.LogDebug("PuTTY initialized, state: {State}", PuTTYInterop.State);
+
             // Connect via integrated PuTTY DLL
+            TerminalDebugLog.Log("Calling PuTTYInterop.Connect()");
             bool success = PuTTYInterop.Connect(hostname, port, username);
+            TerminalDebugLog.Log($"Connect returned: {success}, state: {PuTTYInterop.State}");
             if (!success)
             {
-                _logger.LogWarning("Integrated PuTTY connection failed, falling back to external");
+                var errorMsg = PuTTYInterop.GetErrorMessage() ?? "Connection failed";
+                TerminalDebugLog.Log($"ERROR: Connect failed: {errorMsg}");
+                _logger.LogWarning("Integrated PuTTY connection failed: {Error}", errorMsg);
                 MessageBox.Show(
-                    "Integrated PuTTY connection could not be established.\n\n" +
-                    "Falling back to External PuTTY mode.",
-                    "Connection Fallback",
+                    $"Connection failed:\n{errorMsg}",
+                    "Connection Error",
                     MessageBoxButton.OK,
                     MessageBoxImage.Warning);
-                ConnectExternal(hostname, port, username);
                 return;
             }
 
             // Get the terminal window handle from integrated PuTTY
             _puttyWindowHandle = PuTTYInterop.GetTerminalHandle();
+            TerminalDebugLog.Log($"Terminal HWND: {_puttyWindowHandle}, state: {PuTTYInterop.State}");
+            _logger.LogDebug("Got terminal HWND: {Handle}, state: {State}", _puttyWindowHandle, PuTTYInterop.State);
+
             if (_puttyWindowHandle != IntPtr.Zero)
             {
+                // Embed the PuTTY window into our WPF container
+                TerminalDebugLog.Log("Calling EmbedPuTTYWindow()");
                 EmbedPuTTYWindow();
                 _isConnected = true;
                 UpdateConnectionUI(true, hostname);
                 Connected?.Invoke(this, EventArgs.Empty);
+                TerminalDebugLog.Log("=== ConnectIntegrated SUCCESS ===");
                 _logger.LogInformation("Connected to {Hostname} via integrated PuTTY", hostname);
             }
             else
             {
+                TerminalDebugLog.Log("ERROR: Terminal HWND is zero");
                 _logger.LogWarning("Integrated PuTTY window handle not available");
                 MessageBox.Show(
-                    "Connection initiated but terminal window not available.\n\n" +
-                    "Falling back to External PuTTY mode.",
+                    "Connection established but terminal window not available.\n" +
+                    $"Check log: {PuTTYInterop.GetDllLogPath()}",
                     "Connection Notice",
                     MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                PuTTYInterop.Disconnect();
-                ConnectExternal(hostname, port, username);
+                    MessageBoxImage.Warning);
             }
         }
         catch (DllNotFoundException ex)
@@ -245,11 +365,10 @@ public partial class TerminalPane : UserControl, IDisposable
             _logger.LogError(ex, "PairAdminPuTTY.dll not found");
             MessageBox.Show(
                 "PairAdminPuTTY.dll could not be loaded.\n\n" +
-                "Falling back to External PuTTY mode.",
+                "Please ensure the DLL is present in the application directory.",
                 "DLL Load Error",
                 MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-            ConnectExternal(hostname, port, username);
+                MessageBoxImage.Error);
         }
         catch (Exception ex)
         {
@@ -260,13 +379,60 @@ public partial class TerminalPane : UserControl, IDisposable
 
     private void OnPuTTYCallback(PuTTYInterop.PairAdminEventType eventType, IntPtr data, int length)
     {
-        if (length <= 0 || data == IntPtr.Zero) return;
-
         try
         {
-            byte[] buffer = new byte[length];
-            Marshal.Copy(data, buffer, 0, length);
-            string text = Encoding.UTF8.GetString(buffer);
+            TerminalDebugLog.Log($"OnPuTTYCallback: eventType={eventType} data={data} length={length}");
+
+            // Handle connection state events (no data)
+            if (eventType == PuTTYInterop.PairAdminEventType.Connected)
+            {
+                TerminalDebugLog.Log("Callback: Connected event");
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _logger.LogInformation("PuTTY callback: Connected");
+                    _isConnected = true;
+                    Connected?.Invoke(this, EventArgs.Empty);
+                }));
+                return;
+            }
+
+            if (eventType == PuTTYInterop.PairAdminEventType.Disconnected)
+            {
+                TerminalDebugLog.Log("Callback: Disconnected event");
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _logger.LogInformation("PuTTY callback: Disconnected");
+                    _isConnected = false;
+                    UpdateConnectionUI(false);
+                    Disconnected?.Invoke(this, EventArgs.Empty);
+                }));
+                return;
+            }
+
+            if (eventType == PuTTYInterop.PairAdminEventType.Error)
+            {
+                string errorMsg = "Unknown error";
+                if (length > 0 && data != IntPtr.Zero)
+                {
+                    byte[] buffer = new byte[length];
+                    Marshal.Copy(data, buffer, 0, length);
+                    errorMsg = Encoding.UTF8.GetString(buffer);
+                }
+                TerminalDebugLog.Log($"Callback: Error event - {errorMsg}");
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    _logger.LogError("PuTTY callback: Error - {Message}", errorMsg);
+                    MessageBox.Show($"Terminal error: {errorMsg}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                }));
+                return;
+            }
+
+            // Handle I/O events (require data)
+            if (length <= 0 || data == IntPtr.Zero) return;
+
+            byte[] ioBuffer = new byte[length];
+            Marshal.Copy(data, ioBuffer, 0, length);
+            string text = Encoding.UTF8.GetString(ioBuffer);
 
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -284,6 +450,7 @@ public partial class TerminalPane : UserControl, IDisposable
         }
         catch (Exception ex)
         {
+            TerminalDebugLog.LogException(ex, "OnPuTTYCallback");
             _logger.LogError(ex, "Error processing PuTTY callback");
         }
     }
@@ -294,15 +461,22 @@ public partial class TerminalPane : UserControl, IDisposable
 
     private void ConnectExternal(string hostname, int port, string username)
     {
+        TerminalDebugLog.Log("=== ConnectExternal START ===");
+        TerminalDebugLog.Log($"hostname={hostname} port={port} username={username}");
+
         if (_isConnected) Disconnect();
         _logger.LogInformation("Connecting via external PuTTY to {Hostname}:{Port}", hostname, port);
 
         try
         {
             // Find PuTTY executable
+            TerminalDebugLog.Log($"ExternalPuTTYPath from settings: {_settings.ExternalPuTTYPath}");
             var puttyPath = TerminalSettings.FindExternalPuTTY(_settings.ExternalPuTTYPath);
+            TerminalDebugLog.Log($"FindExternalPuTTY returned: {puttyPath}");
+
             if (string.IsNullOrEmpty(puttyPath))
             {
+                TerminalDebugLog.Log("ERROR: PuTTY executable not found");
                 var result = MessageBox.Show(
                     "PuTTY executable not found.\n\n" +
                     "Would you like to:\n" +
@@ -330,6 +504,7 @@ public partial class TerminalPane : UserControl, IDisposable
                 args.Append($"-l {username} ");
             args.Append($"-P {port} {hostname}");
 
+            TerminalDebugLog.Log($"Launching PuTTY: {puttyPath} {args}");
             _logger.LogDebug("Launching PuTTY: {Path} {Args}", puttyPath, args);
 
             _puttyProcess = Process.Start(new ProcessStartInfo
@@ -339,19 +514,25 @@ public partial class TerminalPane : UserControl, IDisposable
                 UseShellExecute = false
             });
 
+            TerminalDebugLog.Log($"Process started, ID: {_puttyProcess?.Id}");
+            TerminalDebugLog.Log("Waiting for input idle...");
             _puttyProcess?.WaitForInputIdle(5000);
             _puttyWindowHandle = _puttyProcess?.MainWindowHandle ?? IntPtr.Zero;
+            TerminalDebugLog.Log($"MainWindowHandle: {_puttyWindowHandle}");
 
             if (_puttyWindowHandle != IntPtr.Zero)
             {
+                TerminalDebugLog.Log("Calling EmbedPuTTYWindow()");
                 EmbedPuTTYWindow();
                 _isConnected = true;
                 UpdateConnectionUI(true, hostname);
                 Connected?.Invoke(this, EventArgs.Empty);
+                TerminalDebugLog.Log("=== ConnectExternal SUCCESS ===");
                 _logger.LogInformation("Connected to {Hostname} via external PuTTY", hostname);
             }
             else
             {
+                TerminalDebugLog.Log("WARNING: Window handle is zero");
                 MessageBox.Show(
                     "PuTTY started but window handle not available.\n" +
                     "The terminal may have opened in a separate window.",
@@ -362,6 +543,7 @@ public partial class TerminalPane : UserControl, IDisposable
         }
         catch (Exception ex)
         {
+            TerminalDebugLog.LogException(ex, "ConnectExternal");
             _logger.LogError(ex, "Failed to connect via external PuTTY");
             MessageBox.Show($"Failed to connect: {ex.Message}", "Connection Error", MessageBoxButton.OK, MessageBoxImage.Error);
         }
@@ -373,26 +555,60 @@ public partial class TerminalPane : UserControl, IDisposable
 
     private void EmbedPuTTYWindow()
     {
-        if (_puttyWindowHandle == IntPtr.Zero) return;
+        TerminalDebugLog.Log("=== EmbedPuTTYWindow START ===");
+        TerminalDebugLog.Log($"_puttyWindowHandle: {_puttyWindowHandle}");
+
+        if (_puttyWindowHandle == IntPtr.Zero)
+        {
+            TerminalDebugLog.Log("ERROR: _puttyWindowHandle is zero, returning");
+            return;
+        }
 
         var wpfHandle = GetWpfWindowHandle();
-        if (wpfHandle == IntPtr.Zero) return;
+        TerminalDebugLog.Log($"WPF handle: {wpfHandle}");
 
-        // Remove window chrome and set as child
-        int style = NativeMethods.GetWindowLong(_puttyWindowHandle, NativeMethods.GWL_STYLE);
-        style = (style & ~NativeMethods.WS_CAPTION) | NativeMethods.WS_CHILD;
-        NativeMethods.SetWindowLong(_puttyWindowHandle, NativeMethods.GWL_STYLE, style);
+        if (wpfHandle == IntPtr.Zero)
+        {
+            TerminalDebugLog.Log("ERROR: WPF handle is zero, returning");
+            return;
+        }
 
-        // Set parent
-        PuTTYInterop.SetParentWindow(_puttyWindowHandle, wpfHandle);
+        try
+        {
+            // Remove window chrome and set as child
+            TerminalDebugLog.Log("Getting window style...");
+            int style = NativeMethods.GetWindowLong(_puttyWindowHandle, NativeMethods.GWL_STYLE);
+            TerminalDebugLog.Log($"Original style: 0x{style:X8}");
 
-        // Resize to fit
-        ResizeTerminalToFit();
+            style = (style & ~NativeMethods.WS_CAPTION) | NativeMethods.WS_CHILD;
+            TerminalDebugLog.Log($"New style: 0x{style:X8}");
 
-        // Show window
-        PuTTYInterop.Show(_puttyWindowHandle);
+            NativeMethods.SetWindowLong(_puttyWindowHandle, NativeMethods.GWL_STYLE, style);
+            TerminalDebugLog.Log("SetWindowLong completed");
 
-        _logger.LogDebug("PuTTY window embedded successfully");
+            // Set parent
+            TerminalDebugLog.Log("Calling SetParentWindow...");
+            PuTTYInterop.SetParentWindow(_puttyWindowHandle, wpfHandle);
+            TerminalDebugLog.Log("SetParentWindow completed");
+
+            // Resize to fit
+            TerminalDebugLog.Log("Calling ResizeTerminalToFit...");
+            ResizeTerminalToFit();
+            TerminalDebugLog.Log("ResizeTerminalToFit completed");
+
+            // Show window
+            TerminalDebugLog.Log("Calling Show...");
+            PuTTYInterop.Show(_puttyWindowHandle);
+            TerminalDebugLog.Log("Show completed");
+
+            TerminalDebugLog.Log("=== EmbedPuTTYWindow SUCCESS ===");
+            _logger.LogDebug("PuTTY window embedded successfully");
+        }
+        catch (Exception ex)
+        {
+            TerminalDebugLog.LogException(ex, "EmbedPuTTYWindow");
+            throw;
+        }
     }
 
     private IntPtr GetWpfWindowHandle()
@@ -448,6 +664,9 @@ public partial class TerminalPane : UserControl, IDisposable
 
     public void Disconnect()
     {
+        TerminalDebugLog.Log("=== Disconnect START ===");
+        TerminalDebugLog.Log($"Mode: {_settings.Mode}, _puttyProcess: {(_puttyProcess != null ? "non-null" : "null")}");
+
         try
         {
             // Disconnect integrated PuTTY if in that mode
@@ -455,10 +674,15 @@ public partial class TerminalPane : UserControl, IDisposable
             {
                 try
                 {
+                    TerminalDebugLog.Log("Calling PuTTYInterop.Disconnect()...");
+                    // First disconnect the session
                     PuTTYInterop.Disconnect();
+                    TerminalDebugLog.Log("PuTTYInterop.Disconnect() completed");
+                    _logger.LogDebug("PuTTY session disconnected");
                 }
                 catch (Exception ex)
                 {
+                    TerminalDebugLog.LogException(ex, "PuTTYInterop.Disconnect");
                     _logger.LogWarning(ex, "Error disconnecting integrated PuTTY");
                 }
             }
@@ -466,10 +690,15 @@ public partial class TerminalPane : UserControl, IDisposable
             // Disconnect external PuTTY process
             if (_puttyProcess != null && !_puttyProcess.HasExited)
             {
+                TerminalDebugLog.Log("Closing external PuTTY process...");
                 _puttyProcess.CloseMainWindow();
                 if (!_puttyProcess.WaitForExit(2000))
+                {
+                    TerminalDebugLog.Log("Process didn't exit, killing...");
                     _puttyProcess.Kill();
+                }
                 _puttyProcess.Dispose();
+                TerminalDebugLog.Log("External PuTTY process closed");
             }
             _puttyProcess = null;
             _puttyWindowHandle = IntPtr.Zero;
@@ -477,11 +706,32 @@ public partial class TerminalPane : UserControl, IDisposable
             _callbackDelegate = null;
             UpdateConnectionUI(false);
             Disconnected?.Invoke(this, EventArgs.Empty);
+            TerminalDebugLog.Log("=== Disconnect SUCCESS ===");
             _logger.LogInformation("Disconnected from terminal");
         }
         catch (Exception ex)
         {
+            TerminalDebugLog.LogException(ex, "Disconnect");
             _logger.LogError(ex, "Error disconnecting");
+        }
+    }
+
+    /// <summary>
+    /// Fully shutdown the integrated PuTTY system (cleanup thread and resources)
+    /// </summary>
+    public void ShutdownIntegrated()
+    {
+        try
+        {
+            if (_settings.Mode == TerminalMode.Integrated)
+            {
+                PuTTYInterop.Shutdown();
+                _logger.LogInformation("Integrated PuTTY shutdown complete");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Error shutting down integrated PuTTY");
         }
     }
 
@@ -508,6 +758,7 @@ public partial class TerminalPane : UserControl, IDisposable
         if (!_disposed)
         {
             Disconnect();
+            ShutdownIntegrated();
             _disposed = true;
         }
     }

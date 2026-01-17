@@ -97,7 +97,7 @@ public partial class CommandBlockControl : UserControl
                 CopiedText = _commandBlock.Code
             });
 
-            ShowCopyFeedback();
+            ShowCopyFeedback(sender);
             _logger.LogInformation($"Command copied: {_commandBlock.Id}");
         }
         catch (Exception ex)
@@ -107,7 +107,7 @@ public partial class CommandBlockControl : UserControl
         }
     }
 
-    private void ShowCopyFeedback()
+    private void ShowCopyFeedback(object sender)
     {
         var originalContent = (sender as Button)?.Content;
 

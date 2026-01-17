@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <AssemblyName>IoInterceptor</AssemblyName>
-    <RootNamespace>IoInterceptor</RootNamespace>
+    <RootNamespace>PairAdmin.IoInterceptor</RootNamespace>
     <Version>1.0.0</Version>
   </PropertyGroup>
 

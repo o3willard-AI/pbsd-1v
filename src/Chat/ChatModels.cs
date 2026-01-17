@@ -97,6 +97,11 @@ public class ChatMessage
     public string? ParentMessageId { get; set; }
 
     /// <summary>
+    /// Gets the role as a string (User, Assistant, System)
+    /// </summary>
+    public string Role => Sender.ToString().ToLowerInvariant();
+
+    /// <summary>
     /// Gets formatted timestamp string
     /// </summary>
     public string FormattedTimestamp => Timestamp.ToString("HH:mm");

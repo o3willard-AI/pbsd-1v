@@ -16,16 +16,6 @@ public enum PromptType
 }
 
 /// <summary>
-/// Type of directory change
-/// </summary>
-public enum DirectoryChangeType
-{
-    UserCommand,    // User typed command (cd)
-    ParsedPrompt,  // Detected from prompt
-    StackOperation  // push/pop from history
-}
-
-/// <summary>
 /// Parsed prompt information
 /// </summary>
 public class ParsedPrompt

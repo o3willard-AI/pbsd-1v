@@ -10,7 +10,7 @@ namespace PairAdmin.LLMGateway.Providers;
 public class OpenAIClient
 {
     private readonly HttpClient _httpClient;
-    private readonly ILogger<OpenAIClient> _logger;
+    private readonly ILogger _logger;
     private string? _apiKey;
     private string? _organizationId;
     private string _baseUrl;
@@ -28,7 +28,7 @@ public class OpenAIClient
     /// <summary>
     /// Initializes a new instance of OpenAIClient
     /// </summary>
-    public OpenAIClient(ILogger<OpenAIClient> logger)
+    public OpenAIClient(ILogger logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _httpClient = new HttpClient();
@@ -165,39 +165,57 @@ public class OpenAIClient
     {
         request.Stream = true;
 
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            throw new LLMGatewayException("API key is not configured");
+        }
+
+        var chunks = new List<OpenAIStreamChunk>();
+        Exception? capturedException = null;
+        bool shouldBreak = false;
+
         try
         {
-            if (string.IsNullOrWhiteSpace(_apiKey))
-            {
-                throw new LLMGatewayException("API key is not configured");
-            }
-
             var jsonRequest = JsonSerializer.Serialize(request);
             var content = new StringContent(jsonRequest, Encoding.UTF8, "application/json");
 
             var url = _baseUrl + CompletionsEndpoint;
             _logger.LogTrace($"Sending streaming request to {url}");
 
-            var response = await _httpClient.PostAsync(url, content, HttpCompletionOption.ResponseHeadersRead);
+            var httpRequest = new HttpRequestMessage(HttpMethod.Post, url) { Content = content };
+            var response = await _httpClient.SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
 
             if (!response.IsSuccessStatusCode)
             {
                 var responseString = await response.Content.ReadAsStringAsync();
                 HandleErrorResponse(response.StatusCode, responseString);
-                yield break;
+                shouldBreak = true;
             }
-
-            await foreach (var chunk in ParseStreamAsync(response))
+            else
             {
-                yield return chunk;
-            }
+                await foreach (var chunk in ParseStreamAsync(response))
+                {
+                    chunks.Add(chunk);
+                }
 
-            _logger.LogTrace("Streaming completed");
+                _logger.LogTrace("Streaming completed");
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to send streaming request");
-            throw new LLMGatewayException("Failed to send streaming request to OpenAI", ex);
+            capturedException = new LLMGatewayException("Failed to send streaming request to OpenAI", ex);
+        }
+
+        // Yield outside try-catch
+        foreach (var chunk in chunks)
+        {
+            yield return chunk;
+        }
+
+        if (capturedException != null)
+        {
+            throw capturedException;
         }
     }
 
@@ -206,6 +224,8 @@ public class OpenAIClient
     /// </summary>
     private async IAsyncEnumerable<OpenAIStreamChunk> ParseStreamAsync(HttpResponseMessage response)
     {
+        var chunks = new List<OpenAIStreamChunk>();
+
         using var stream = await response.Content.ReadAsStreamAsync();
         using var reader = new StreamReader(stream);
 
@@ -224,8 +244,8 @@ public class OpenAIClient
 
                 if (data == "[DONE]")
                 {
-                    yield return new OpenAIStreamChunk { IsDone = true };
-                    yield break;
+                    chunks.Add(new OpenAIStreamChunk { IsDone = true });
+                    break;
                 }
 
                 try
@@ -233,7 +253,7 @@ public class OpenAIClient
                     var chunk = JsonSerializer.Deserialize<OpenAIStreamChunk>(data);
                     if (chunk != null)
                     {
-                        yield return chunk;
+                        chunks.Add(chunk);
                     }
                 }
                 catch (JsonException ex)
@@ -241,6 +261,12 @@ public class OpenAIClient
                     _logger.LogWarning(ex, $"Failed to parse stream chunk: {data}");
                 }
             }
+        }
+
+        // Yield outside the using blocks
+        foreach (var chunk in chunks)
+        {
+            yield return chunk;
         }
     }
 

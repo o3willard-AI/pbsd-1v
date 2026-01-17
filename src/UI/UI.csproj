@@ -4,6 +4,7 @@
     <TargetFramework>net8.0-windows</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
     <AssemblyName>UI</AssemblyName>
     <RootNamespace>PairAdmin.UI</RootNamespace>
     <Version>1.0.0</Version>
@@ -14,7 +15,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <Page Include="**\*.xaml" />
+    <ProjectReference Include="..\Chat\Chat.csproj" />
+    <ProjectReference Include="..\LLMGateway\LLMGateway.csproj" />
+    <ProjectReference Include="..\Interop\Interop.csproj" />
   </ItemGroup>
 
 </Project>
