@@ -57,16 +57,16 @@ public class OpenAIClient
         if (!string.IsNullOrWhiteSpace(_apiKey))
         {
             _httpClient.DefaultRequestHeaders.Clear();
-        }
-        else
-        {
-            _httpClient.DefaultRequestHeaders.Clear();
             _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_apiKey}");
 
             if (!string.IsNullOrWhiteSpace(_organizationId))
             {
                 _httpClient.DefaultRequestHeaders.Add("OpenAI-Organization", _organizationId);
             }
+        }
+        else
+        {
+            _httpClient.DefaultRequestHeaders.Clear();
         }
 
         _logger.LogInformation("OpenAIClient configured");

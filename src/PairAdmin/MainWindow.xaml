@@ -40,8 +40,17 @@
                         Orientation="Horizontal"
                         VerticalAlignment="Center"
                         Margin="8,0">
+                <Button Content="⚙" 
+                        Width="40"
+                        Height="32"
+                        Background="Transparent"
+                        Foreground="White"
+                        BorderThickness="0"
+                        Click="SettingsButton_Click"
+                        WindowChrome.IsHitTestVisibleInChrome="True"
+                        ToolTip="Settings"/>
                 <Button Content="−" 
-                        Width="46"
+                        Width="40"
                         Height="32"
                         Background="Transparent"
                         Foreground="White"
@@ -49,7 +58,7 @@
                         Click="MinimizeButton_Click"
                         WindowChrome.IsHitTestVisibleInChrome="True"/>
                 <Button Content="□" 
-                        Width="46"
+                        Width="40"
                         Height="32"
                         Background="Transparent"
                         Foreground="White"
@@ -57,7 +66,7 @@
                         Click="MaximizeButton_Click"
                         WindowChrome.IsHitTestVisibleInChrome="True"/>
                 <Button Content="×" 
-                        Width="46"
+                        Width="40"
                         Height="32"
                         Background="Transparent"
                         Foreground="White"

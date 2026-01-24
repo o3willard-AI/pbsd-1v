@@ -1,0 +1,12 @@
+LIBRARY PairAdminPuTTY
+EXPORTS
+    pairadmin_set_callback
+    pairadmin_init
+    pairadmin_connect
+    pairadmin_disconnect
+    pairadmin_is_connected
+    pairadmin_get_state
+    pairadmin_get_error
+    pairadmin_shutdown
+    pairadmin_get_log_path
+    putty_get_terminal_hwnd

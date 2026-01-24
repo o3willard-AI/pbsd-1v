@@ -297,8 +297,16 @@ public partial class ChatPane : UserControl
             return;
         }
 
-        AddUserMessage(InputTextBox.Text);
-        InputTextBox.Clear();
+        try
+        {
+            AddUserMessage(InputTextBox.Text);
+            InputTextBox.Clear();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Failed to send message");
+            MessageBox.Show($"Failed to send message: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     private void ClearButton_Click(object sender, RoutedEventArgs e)
